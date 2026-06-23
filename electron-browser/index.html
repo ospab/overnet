@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>overnet</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; height: 100vh; display: flex; flex-direction: column;
+           font-family: system-ui, sans-serif; background: #111; }
+    #bar { display: flex; gap: 8px; padding: 8px; background: #1e1e1e; }
+    #url { flex: 1; padding: 9px 12px; border-radius: 7px; border: 1px solid #444;
+           background: #2a2a2a; color: #eee; font-size: 14px; outline: none; }
+    #url:focus { border-color: #3b82f6; }
+    button { padding: 9px 16px; border: 0; border-radius: 7px; background: #3b82f6;
+             color: #fff; cursor: pointer; font-size: 14px; }
+    webview { flex: 1; border: 0; background: #fff; }
+  </style>
+</head>
+<body>
+  <div id="bar">
+    <button id="back" title="назад">←</button>
+    <input id="url" value="overnet://search.ov/" placeholder="overnet://search.ov" />
+    <button id="go">→</button>
+  </div>
+  <webview id="view" src="overnet://search.ov/"></webview>
+
+  <script>
+    const url = document.getElementById('url');
+    const view = document.getElementById('view');
+
+    function navigate() {
+      let u = url.value.trim();
+      if (!u.startsWith('overnet://')) u = 'overnet://' + u;
+      url.value = u;
+      view.loadURL(u);
+    }
+
+    document.getElementById('go').addEventListener('click', navigate);
+    document.getElementById('back').addEventListener('click', () => {
+      if (view.canGoBack()) view.goBack();
+    });
+    url.addEventListener('keydown', (e) => { if (e.key === 'Enter') navigate(); });
+
+    // Держим адресную строку в синхроне с навигацией внутри webview.
+    view.addEventListener('did-navigate', (e) => { url.value = e.url; });
+  </script>
+</body>
+</html>

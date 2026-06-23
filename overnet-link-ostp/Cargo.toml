@@ -1,0 +1,17 @@
+[package]
+name = "overnet-link-ostp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+overnet-core = { path = "../overnet-core" }
+# Переиспользуем, не переписываем: Reality + Noise + паддинг + надёжный туннель.
+# overnet и ostp оба под AGPLv3 — зависимость чистая.
+ostp-core = { path = "../../ostp/ostp-core" }
+bytes.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+
+[dev-dependencies]
+overnet-link-tcp = { path = "../overnet-link-tcp" }

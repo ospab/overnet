@@ -1,0 +1,32 @@
+[workspace]
+members = [
+    "overnet-core",
+    "overnet-link-tcp",
+    "overnet-link-ostp",
+    "overnet-node",
+    "overnet-cli", "overnet-browser",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "AGPL-3.0-only"
+version = "0.0.1"
+
+[workspace.dependencies]
+anyhow = "1.0"
+bytes = "1.6"
+thiserror = "1.0"
+async-trait = "0.1"
+tracing = "0.1"
+tokio = { version = "1.37", features = ["rt-multi-thread", "macros", "net", "time", "io-util", "sync", "signal"] }
+
+# Крипто — те же крейты, что в ostp. Свою крипту НЕ катаем.
+ed25519-dalek = "2.1"   # личность + подписи (адрес = f(pubkey), ваучеры)
+x25519-dalek = "2.0"    # обмен ключами (per-hop ECDH в onion)
+chacha20poly1305 = "0.10" # AEAD
+snow = "0.9"            # Noise Framework (хендшейки)
+sha2 = "0.10"
+hmac = "0.12"
+rand = "0.8"
+base64 = "0.22"

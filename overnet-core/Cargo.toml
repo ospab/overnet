@@ -1,0 +1,16 @@
+[package]
+name = "overnet-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+ed25519-dalek = { workspace = true, features = ["rand_core"] }
+x25519-dalek = { workspace = true, features = ["static_secrets"] }
+chacha20poly1305.workspace = true
+sha2.workspace = true
+rand.workspace = true
+thiserror.workspace = true
+async-trait.workspace = true
+tokio.workspace = true
+snow.workspace = true

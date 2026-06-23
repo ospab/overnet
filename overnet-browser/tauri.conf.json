@@ -1,0 +1,36 @@
+{
+  "build": {
+    "distDir": "ui",
+    "devPath": "ui",
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "",
+    "withGlobalTauri": true
+  },
+  "package": {
+    "productName": "overnet-browser",
+    "version": "0.1.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": true
+    },
+    "bundle": {
+      "active": false,
+      "icon": ["icons/icon.png"],
+      "identifier": "com.overnet.browser",
+      "targets": "all"
+    },
+    "security": {
+      "csp": null
+    },
+    "windows": [
+      {
+        "title": "overnet browser",
+        "width": 1024,
+        "height": 768,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ]
+  }
+}

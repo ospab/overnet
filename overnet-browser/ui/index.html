@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>overnet</title>
+<style>
+:root{--bg:#0d0d0d;--bar:#1a1a1a;--text:#f5f5f5;--accent:#9d4edd;--accent2:#c77dff;--border:rgba(255,255,255,.1);--muted:#888;}
+*{box-sizing:border-box;}
+body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+.tabbar{display:flex;align-items:flex-end;gap:4px;background:#000;padding:6px 8px 0;overflow-x:auto;}
+.tab{display:flex;align-items:center;gap:8px;max-width:220px;padding:8px 12px;background:var(--bar);border:1px solid var(--border);border-bottom:none;border-radius:8px 8px 0 0;cursor:pointer;font-size:13px;color:var(--muted);white-space:nowrap;}
+.tab.active{background:var(--bg);color:var(--text);}
+.tab .title{overflow:hidden;text-overflow:ellipsis;max-width:160px;}
+.tab .close{opacity:.6;border-radius:4px;padding:0 5px;line-height:1;}
+.tab .close:hover{background:rgba(255,255,255,.15);opacity:1;}
+#newtab{background:transparent;color:var(--muted);border:none;font-size:18px;cursor:pointer;padding:4px 12px;}
+#newtab:hover{color:var(--text);}
+.settings-bar{display:flex;align-items:center;gap:10px;background:#141414;padding:6px 12px;font-size:12px;border-bottom:1px solid var(--border);}
+.settings-bar input{background:#2a2a2a;border:1px solid #444;color:#fff;padding:4px 8px;border-radius:4px;font-family:monospace;}
+.settings-bar button{background:var(--accent);color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;}
+.settings-bar button:hover{background:var(--accent2);}
+.badge{padding:3px 8px;border-radius:10px;background:#333;color:#aaa;}
+.badge.ok{background:rgba(46,204,113,.2);color:#2ecc71;}
+.toolbar{display:flex;align-items:center;gap:8px;background:var(--bar);padding:8px 12px;border-bottom:1px solid var(--border);}
+.nav-btn{background:transparent;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 11px;cursor:pointer;font-size:15px;}
+.nav-btn:disabled{opacity:.3;cursor:not-allowed;}
+.nav-btn:hover:not(:disabled){background:rgba(255,255,255,.1);}
+.addr{flex:1;background:rgba(0,0,0,.5);border:1px solid var(--border);border-radius:18px;color:var(--text);padding:7px 16px;font-family:monospace;font-size:13px;outline:none;}
+.addr:focus{border-color:var(--accent);}
+.views{flex:1;position:relative;background:#fff;}
+.views iframe{position:absolute;inset:0;width:100%;height:100%;border:none;background:#fff;}
+.hidden{display:none !important;}
+.home{position:absolute;inset:0;overflow:auto;background:radial-gradient(circle at 50% 30%,#1a1a1a,#0d0d0d);color:#f5f5f5;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;}
+.home h1{font-size:56px;margin:0 0 6px;letter-spacing:-2px;}
+.home h1 span{color:var(--accent);}
+.home p{color:var(--muted);}
+.grid{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:24px;max-width:760px;padding:0 20px;}
+.card{cursor:pointer;background:#1e1e1e;border:1px solid var(--border);border-radius:10px;padding:14px 18px;min-width:170px;text-align:left;}
+.card:hover{border-color:var(--accent);}
+.card .role{color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:.5px;}
+.card .pk{font-family:monospace;margin:5px 0;font-size:13px;}
+.card .ad{color:#777;font-size:12px;font-family:monospace;}
+</style>
+</head>
+<body>
+<div class="tabbar" id="tabbar"><button id="newtab" title="Новая вкладка">+</button></div>
+<div class="settings-bar">
+  <span>Bootstrap:</span>
+  <input id="bootstrap-ip" style="width:150px" placeholder="127.0.0.1:8080">
+  <button id="connect-btn">Connect</button>
+  <span id="conn-status" class="badge">Not Connected</span>
+</div>
+<div class="toolbar">
+  <button id="btn-back" class="nav-btn" disabled>&#8592;</button>
+  <button id="btn-fwd" class="nav-btn" disabled>&#8594;</button>
+  <button id="btn-reload" class="nav-btn">&#8635;</button>
+  <input id="url-input" class="addr" placeholder="overnet://search.ov/" spellcheck="false">
+</div>
+<div class="views" id="views">
+  <div id="home" class="home hidden"></div>
+</div>
+
+<script>
+const { invoke } = window.__TAURI__.tauri;
+const $ = id => document.getElementById(id);
+let tabs = [], activeId = null, nextId = 1, directory = null;
+
+function activeTab(){ return tabs.find(t => t.id === activeId); }
+
+function renderHome(){
+  let cards = '<p>Подключись к bootstrap, чтобы увидеть узлы сети.</p>';
+  if (directory && directory.nodes && directory.nodes.length){
+    cards = '<div class="grid">' + directory.nodes.map(n =>
+      `<div class="card" onclick="loadUrl('overnet://${n.pubkey}/')">
+         <div class="role">${n.role}</div>
+         <div class="pk">${n.pubkey.slice(0,16)}…</div>
+         <div class="ad">${n.address}</div>
+       </div>`).join('') + '</div>';
+  }
+  $('home').innerHTML =
+    `<h1>over<span>net</span></h1>
+     <p>Децентрализованная сеть. Введи адрес сверху или выбери узел.</p>${cards}`;
+}
+
+function createTab(url){
+  const id = nextId++;
+  const iframe = document.createElement('iframe');
+  iframe.className = 'hidden';
+  $('views').appendChild(iframe);
+  tabs.push({ id, url: url || null, title: url ? '…' : 'Новая вкладка', history: [], idx: -1, iframe });
+  setActive(id);
+  if (url) loadUrl(url);
+}
+
+function closeTab(id){
+  const i = tabs.findIndex(t => t.id === id);
+  if (i < 0) return;
+  tabs[i].iframe.remove();
+  tabs.splice(i, 1);
+  if (tabs.length === 0){ createTab(); return; }
+  if (activeId === id) setActive(tabs[Math.max(0, i - 1)].id);
+  else renderTabs();
+}
+
+function setActive(id){
+  activeId = id;
+  const t = activeTab();
+  tabs.forEach(x => x.iframe.classList.add('hidden'));
+  if (t && t.url){ $('home').classList.add('hidden'); t.iframe.classList.remove('hidden'); }
+  else { renderHome(); $('home').classList.remove('hidden'); }
+  $('url-input').value = t ? (t.url || '') : '';
+  updateNav(); renderTabs();
+}
+
+function renderTabs(){
+  const bar = $('tabbar');
+  [...bar.querySelectorAll('.tab')].forEach(e => e.remove());
+  tabs.forEach(t => {
+    const el = document.createElement('div');
+    el.className = 'tab' + (t.id === activeId ? ' active' : '');
+    const title = document.createElement('span'); title.className = 'title'; title.textContent = t.title;
+    const close = document.createElement('span'); close.className = 'close'; close.textContent = '✕';
+    close.onclick = e => { e.stopPropagation(); closeTab(t.id); };
+    el.append(title, close);
+    el.onclick = () => setActive(t.id);
+    bar.insertBefore(el, $('newtab'));
+  });
+}
+
+function updateNav(){
+  const t = activeTab();
+  $('btn-back').disabled = !t || t.idx <= 0;
+  $('btn-fwd').disabled = !t || t.idx >= t.history.length - 1;
+}
+
+async function loadUrl(url, addHistory = true){
+  let u = (url || '').trim();
+  if (!u) return;
+  if (!u.startsWith('overnet://')) u = 'overnet://' + u;
+  const t = activeTab(); if (!t) return;
+  t.url = u; $('url-input').value = u;
+  if (addHistory){ t.history = t.history.slice(0, t.idx + 1); t.history.push(u); t.idx++; }
+  updateNav();
+  $('home').classList.add('hidden');
+  t.iframe.classList.remove('hidden');
+  t.iframe.srcdoc = '<body style="font-family:system-ui;color:#888;text-align:center;padding-top:60px">Маршрутизация через overnet…</body>';
+  t.title = '…'; renderTabs();
+  try {
+    const html = await invoke('navigate', { url: u });
+    t.iframe.srcdoc = html;
+    t.title = extractTitle(html, u);
+  } catch (e) {
+    t.iframe.srcdoc = `<body style="font-family:system-ui;padding:24px"><h2 style="color:#c0392b">Ошибка</h2><pre>${e}</pre><p style="color:#888">Запущены ли bootstrap и service? Нажата ли Connect?</p></body>`;
+    t.title = 'Ошибка';
+  }
+  renderTabs();
+}
+
+function extractTitle(html, url){
+  const m = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+  if (m && m[1].trim()) return m[1].trim();
+  try { return new URL(url).host || 'overnet'; } catch (_) { return 'overnet'; }
+}
+
+// Навигация
+$('newtab').onclick = () => createTab();
+$('btn-back').onclick = () => { const t = activeTab(); if (t && t.idx > 0){ t.idx--; loadUrl(t.history[t.idx], false); } };
+$('btn-fwd').onclick = () => { const t = activeTab(); if (t && t.idx < t.history.length - 1){ t.idx++; loadUrl(t.history[t.idx], false); } };
+$('btn-reload').onclick = () => { const t = activeTab(); if (t && t.url) loadUrl(t.url, false); else if (t){ renderHome(); $('home').classList.remove('hidden'); } };
+$('url-input').addEventListener('keydown', e => { if (e.key === 'Enter') loadUrl($('url-input').value); });
+
+// Bootstrap
+$('bootstrap-ip').value = localStorage.getItem('bootstrapIp') || '127.0.0.1:8080';
+$('connect-btn').onclick = async () => {
+  const ip = $('bootstrap-ip').value.trim(); if (!ip) return;
+  $('connect-btn').disabled = true; $('conn-status').textContent = '…'; $('conn-status').className = 'badge';
+  try {
+    directory = await invoke('connect_bootstrap', { addr: ip });
+    localStorage.setItem('bootstrapIp', ip);
+    $('conn-status').textContent = `Connected (${directory.nodes.length})`;
+    $('conn-status').className = 'badge ok';
+    if (activeTab() && !activeTab().url) renderHome();
+  } catch (e) { $('conn-status').textContent = 'Error'; alert(e); }
+  finally { $('connect-btn').disabled = false; }
+};
+
+createTab(); // первая вкладка — домашняя
+</script>
+</body>
+</html>

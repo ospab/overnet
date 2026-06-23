@@ -1,0 +1,24 @@
+/private/
+
+# Секреты и ключи (на будущее)
+*.key
+*.pem
+*.p12
+secrets/
+.env
+.env.*
+
+# Сборки / артефакты
+/target/
+*.exe
+*.dll
+*.so
+*.dylib
+*.log
+
+# Редакторы / ОС
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

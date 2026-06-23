@@ -1,0 +1,17 @@
+[package]
+name = "overnet-browser"
+version = "0.1.0"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = "1.5.0"
+
+[dependencies]
+tauri = { version = "1.5.0", features = ["custom-protocol"] }
+tokio = { workspace = true, features = ["full"] }
+overnet-core = { path = "../overnet-core" }
+overnet-node = { path = "../overnet-node" }
+overnet-link-tcp = { path = "../overnet-link-tcp" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+hex = "0.4.3"
