@@ -96,8 +96,9 @@ pub async fn fetch_from(service: &NodeInfo, path: &str) -> Result<HttpResponse> 
 }
 
 /// Найти узел-сервис в каталоге по имени или pubkey и запросить у него `path`.
-pub async fn fetch_service(bootstrap_addr: &str, host: &str, path: &str) -> Result<HttpResponse> {
-    let dir = fetch_directory(bootstrap_addr).await?;
+pub async fn fetch_service(bootstrap_addr: &str, token: String, host: &str, path: &str) -> Result<HttpResponse> {
+    use crate::bootstrap::fetch_directory_with_token;
+    let dir = fetch_directory_with_token(bootstrap_addr, token).await?;
     let service = dir
         .nodes
         .into_iter()
@@ -189,7 +190,8 @@ pub async fn run_gateway_on(
                 }
             }
             let (host, path) = parse_request(&buf).unwrap_or_else(|| ("".to_string(), "/".to_string()));
-            let (status, body) = match fetch_service(&bootstrap, &host, &path).await {
+            let token = crate::bootstrap::load_token(); // Gateway использует локальный токен
+            let (status, body) = match fetch_service(&bootstrap, token, &host, &path).await {
                 Ok(r) => (r.status, r.body),
                 Err(e) => (502, format!("<h1>overnet gateway error</h1><pre>{e}</pre>")),
             };
@@ -245,7 +247,7 @@ mod tests {
             role: "service".into(),
         }).await.unwrap();
 
-        let resp = fetch_service(&boot_addr, &hex_encode(&service_pub), "/hello").await.unwrap();
+        let resp = fetch_service(&boot_addr, String::new(), &hex_encode(&service_pub), "/hello").await.unwrap();
         assert_eq!(resp.status, 200);
         assert!(resp.body.contains("path=/hello"));
     }

@@ -45,20 +45,23 @@ async fn main() {
             println!("overnet relay listening on {bind}");
             println!("onion pubkey: {}", pubkey_hex);
             
+            let advertise = std::env::var("ADVERTISE_IP").unwrap_or_else(|_| bind.clone());
             let info = NodeInfo {
                 pubkey: pubkey_hex,
-                address: bind.clone(),
+                address: advertise,
                 role: "relay".to_string(),
                 name: String::new(),
             };
             
-            // Register with bootstrap in background (with retries in a real app, here just once)
+            // Периодически регистрируемся (чтобы пережить рестарт bootstrap-сервера)
             tokio::spawn(async move {
-                println!("Registering with bootstrap server {}...", bootstrap_addr);
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await; // wait for listener
-                match register_node(&bootstrap_addr, info).await {
-                    Ok(_) => println!("Successfully registered with bootstrap server!"),
-                    Err(e) => eprintln!("Failed to register with bootstrap server: {:?}", e),
+                loop {
+                    println!("Registering with bootstrap server {}...", bootstrap_addr);
+                    match register_node(&bootstrap_addr, info.clone()).await {
+                        Ok(_) => println!("Successfully registered with bootstrap server!"),
+                        Err(e) => eprintln!("Failed to register with bootstrap server: {:?}", e),
+                    }
+                    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
                 }
             });
             
@@ -89,19 +92,22 @@ async fn main() {
             }
             println!("onion pubkey: {}", pubkey_hex);
             
+            let advertise = std::env::var("ADVERTISE_IP").unwrap_or_else(|_| bind.clone());
             let info = NodeInfo {
                 pubkey: pubkey_hex,
-                address: bind.clone(),
+                address: advertise,
                 role: "service".to_string(),
                 name,
             };
             
             tokio::spawn(async move {
-                println!("Registering with bootstrap server {}...", bootstrap_addr);
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await; // wait for listener
-                match register_node(&bootstrap_addr, info).await {
-                    Ok(_) => println!("Successfully registered with bootstrap server!"),
-                    Err(e) => eprintln!("Failed to register with bootstrap server: {:?}", e),
+                loop {
+                    println!("Registering with bootstrap server {}...", bootstrap_addr);
+                    match register_node(&bootstrap_addr, info.clone()).await {
+                        Ok(_) => println!("Successfully registered with bootstrap server!"),
+                        Err(e) => eprintln!("Failed to register with bootstrap server: {:?}", e),
+                    }
+                    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
                 }
             });
             

@@ -10,6 +10,7 @@ use overnet_node::bootstrap::{fetch_directory, Directory};
 /// Состояние приложения: запомненный адрес bootstrap и последний каталог сети.
 struct AppState {
     bootstrap_addr: Mutex<Option<String>>,
+    bootstrap_token: Mutex<Option<String>>,
     directory: Mutex<Option<Directory>>,
 }
 
@@ -17,13 +18,15 @@ struct AppState {
 #[tauri::command]
 async fn connect_bootstrap(
     addr: String,
+    token: String,
     state: State<'_, Arc<AppState>>,
 ) -> Result<Directory, String> {
-    let dir = fetch_directory(&addr)
+    let dir = overnet_node::bootstrap::fetch_directory_with_token(&addr, token.clone())
         .await
         .map_err(|e| format!("Не удалось получить каталог: {e}"))?;
     *state.directory.lock().await = Some(dir.clone());
     *state.bootstrap_addr.lock().await = Some(addr);
+    *state.bootstrap_token.lock().await = Some(token);
     Ok(dir)
 }
 
@@ -48,7 +51,14 @@ async fn navigate(url: String, state: State<'_, Arc<AppState>>) -> Result<String
         .clone()
         .ok_or_else(|| "Сначала подключись к Bootstrap-ноде".to_string())?;
 
-    overnet_node::web::fetch_service(&bootstrap, &host, &path)
+    let token = state
+        .bootstrap_token
+        .lock()
+        .await
+        .clone()
+        .unwrap_or_default();
+
+    overnet_node::web::fetch_service(&bootstrap, token, &host, &path)
         .await
         .map(|r| r.body)
         .map_err(|e| e.to_string())
@@ -57,6 +67,7 @@ async fn navigate(url: String, state: State<'_, Arc<AppState>>) -> Result<String
 fn main() {
     let app_state = Arc::new(AppState {
         bootstrap_addr: Mutex::new(None),
+        bootstrap_token: Mutex::new(None),
         directory: Mutex::new(None),
     });
 

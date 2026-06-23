@@ -21,6 +21,14 @@ body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--
 .settings-bar button:hover{background:var(--accent2);}
 .badge{padding:3px 8px;border-radius:10px;background:#333;color:#aaa;}
 .badge.ok{background:rgba(46,204,113,.2);color:#2ecc71;}
+.badge.error{background:rgba(231,76,60,.2);color:#e74c3c;cursor:pointer;text-decoration:underline;}
+.badge.error:hover{background:rgba(231,76,60,.3);}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:100;align-items:center;justify-content:center;}
+.modal{background:#1a1a1a;border:1px solid var(--border);border-radius:8px;padding:20px;max-width:400px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,.5);}
+.modal h2{margin-top:0;color:#e74c3c;font-size:18px;}
+.modal pre{background:#0d0d0d;padding:10px;border-radius:4px;overflow-x:auto;color:#ccc;font-size:12px;white-space:pre-wrap;}
+.modal-close{background:#333;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;float:right;margin-top:10px;}
+.modal-close:hover{background:#444;}
 .toolbar{display:flex;align-items:center;gap:8px;background:var(--bar);padding:8px 12px;border-bottom:1px solid var(--border);}
 .nav-btn{background:transparent;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 11px;cursor:pointer;font-size:15px;}
 .nav-btn:disabled{opacity:.3;cursor:not-allowed;}
@@ -47,6 +55,7 @@ body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--
 <div class="settings-bar">
   <span>Bootstrap:</span>
   <input id="bootstrap-ip" style="width:150px" placeholder="127.0.0.1:8080">
+  <input id="bootstrap-token" style="width:100px" type="password" placeholder="Token (opt)">
   <button id="connect-btn">Connect</button>
   <span id="conn-status" class="badge">Not Connected</span>
 </div>
@@ -58,6 +67,14 @@ body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--
 </div>
 <div class="views" id="views">
   <div id="home" class="home hidden"></div>
+</div>
+
+<div class="modal-overlay" id="error-modal">
+  <div class="modal">
+    <h2>Connection Error</h2>
+    <pre id="error-text"></pre>
+    <button class="modal-close" id="modal-close">Close</button>
+  </div>
 </div>
 
 <script>
@@ -150,7 +167,23 @@ async function loadUrl(url, addHistory = true){
     t.iframe.srcdoc = html;
     t.title = extractTitle(html, u);
   } catch (e) {
-    t.iframe.srcdoc = `<body style="font-family:system-ui;padding:24px"><h2 style="color:#c0392b">Ошибка</h2><pre>${e}</pre><p style="color:#888">Запущены ли bootstrap и service? Нажата ли Connect?</p></body>`;
+    t.iframe.srcdoc = `
+    <html>
+    <head><style>
+    body { font-family: system-ui, sans-serif; background: #121212; color: #f5f5f5; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+    .err-box { background: #1e1e1e; padding: 30px; border-radius: 8px; border-top: 4px solid #e74c3c; max-width: 500px; text-align: center; }
+    h1 { margin-top: 0; color: #e74c3c; }
+    pre { background: #0d0d0d; padding: 12px; border-radius: 4px; overflow-x: auto; color: #aaa; text-align: left; }
+    </style></head>
+    <body>
+      <div class="err-box">
+        <h1>Не удалось открыть страницу</h1>
+        <p>overnet не смог маршрутизировать ваш запрос.</p>
+        <pre>${e}</pre>
+        <p style="color:#888; font-size:13px">Проверьте, зарегистрирован ли этот сервис в Bootstrap-ноде и запущен ли ваш Relay.</p>
+      </div>
+    </body>
+    </html>`;
     t.title = 'Ошибка';
   }
   renderTabs();
@@ -162,29 +195,43 @@ function extractTitle(html, url){
   try { return new URL(url).host || 'overnet'; } catch (_) { return 'overnet'; }
 }
 
-// Навигация
 $('newtab').onclick = () => createTab();
 $('btn-back').onclick = () => { const t = activeTab(); if (t && t.idx > 0){ t.idx--; loadUrl(t.history[t.idx], false); } };
 $('btn-fwd').onclick = () => { const t = activeTab(); if (t && t.idx < t.history.length - 1){ t.idx++; loadUrl(t.history[t.idx], false); } };
 $('btn-reload').onclick = () => { const t = activeTab(); if (t && t.url) loadUrl(t.url, false); else if (t){ renderHome(); $('home').classList.remove('hidden'); } };
 $('url-input').addEventListener('keydown', e => { if (e.key === 'Enter') loadUrl($('url-input').value); });
 
-// Bootstrap
+$('modal-close').onclick = () => $('error-modal').style.display = 'none';
+$('conn-status').onclick = () => {
+    if ($('conn-status').classList.contains('error') && lastError) {
+        $('error-text').textContent = lastError;
+        $('error-modal').style.display = 'flex';
+    }
+};
+
 $('bootstrap-ip').value = localStorage.getItem('bootstrapIp') || '127.0.0.1:8080';
+$('bootstrap-token').value = localStorage.getItem('bootstrapToken') || '';
 $('connect-btn').onclick = async () => {
   const ip = $('bootstrap-ip').value.trim(); if (!ip) return;
+  const token = $('bootstrap-token').value.trim();
   $('connect-btn').disabled = true; $('conn-status').textContent = '…'; $('conn-status').className = 'badge';
   try {
-    directory = await invoke('connect_bootstrap', { addr: ip });
+    directory = await invoke('connect_bootstrap', { addr: ip, token: token });
     localStorage.setItem('bootstrapIp', ip);
+    localStorage.setItem('bootstrapToken', token);
     $('conn-status').textContent = `Connected (${directory.nodes.length})`;
     $('conn-status').className = 'badge ok';
+    lastError = "";
     if (activeTab() && !activeTab().url) renderHome();
-  } catch (e) { $('conn-status').textContent = 'Error'; alert(e); }
+  } catch (e) {
+    lastError = e;
+    $('conn-status').textContent = 'Error';
+    $('conn-status').className = 'badge error';
+  }
   finally { $('connect-btn').disabled = false; }
 };
 
-createTab(); // первая вкладка — домашняя
+createTab();
 </script>
 </body>
 </html>

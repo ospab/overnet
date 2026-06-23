@@ -40,7 +40,7 @@ struct Config {
     token: Option<String>,
 }
 
-fn load_token() -> String {
+pub fn load_token() -> String {
     if let Ok(content) = std::fs::read_to_string("config.json") {
         if let Ok(cfg) = serde_json::from_str::<Config>(&content) {
             if let Some(t) = cfg.token {
@@ -122,8 +122,11 @@ pub async fn register_node(bootstrap_addr: &str, info: NodeInfo) -> Result<()> {
 }
 
 pub async fn fetch_directory(bootstrap_addr: &str) -> Result<Directory> {
+    fetch_directory_with_token(bootstrap_addr, load_token()).await
+}
+
+pub async fn fetch_directory_with_token(bootstrap_addr: &str, token: String) -> Result<Directory> {
     let link = TcpLink::connect(bootstrap_addr).await?;
-    let token = load_token();
     let msg = BootstrapMessage::GetDirectory { token };
     let frame = serde_json::to_vec(&msg).map_err(|_| Error::Link("JSON error".into()))?;
     link.send(&frame).await?;
