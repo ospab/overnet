@@ -11,8 +11,11 @@ use rand::rngs::OsRng;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
+pub mod cell;
 pub mod link;
+pub mod ntor;
 pub mod onion;
+pub mod ovaddr;
 pub mod session;
 pub use link::{Link, LinkProps};
 

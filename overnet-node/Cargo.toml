@@ -9,4 +9,9 @@ overnet-core = { path = "../overnet-core" }
 overnet-link-tcp = { path = "../overnet-link-tcp" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
-tokio.workspace = true
+tokio = { workspace = true, features = ["fs"] }
+base64.workspace = true
+sha2.workspace = true
+rand.workspace = true
+hex = "0.4"
+async-trait.workspace = true

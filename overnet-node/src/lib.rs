@@ -9,6 +9,9 @@ use overnet_link_tcp::{TcpLink, TcpListenerLink};
 pub mod router;
 pub mod bootstrap;
 pub mod web;
+pub mod guard;
+pub mod messenger;
+pub mod net;
 
 /// Обслуживать входящие соединения: на каждое — рукопожатие (ответчик) и
 /// эхо принятых сообщений. Каждое соединение — в своей задаче.

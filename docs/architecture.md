@@ -142,7 +142,7 @@ trait Link {
 
 **Фаза 1 — Overlay (сегодня).**
 Поверх интернета, маскировка под разрешённый трафик. Интернет-`Link` оборачивает
-`ostp_core::protocol::ProtocolMachine` (Reality/TLS-мимикрия + Noise + паддинг) —
+`ostp_core::protocol::ProtocolMachine` (Noise + паддинг + обфускация заголовков; Reality из ostp убран в 0.4.0) —
 переиспользуем, не переписываем (overnet зависит от `ostp-core` по path). Даёт
 пользу и пользователей уже сейчас, обкатывает ядро. Onion-слои overnet — сверху.
 

@@ -1,0 +1,11 @@
+{
+  "token": "",
+  "bs_peers": [],
+  "node_ttl_secs": 120,
+
+  "relays": [],
+  "reserved": {},
+  "gateway": { "listen": "127.0.0.1:9150", "clearnet": "direct" },
+  "relay": { "listen": "0.0.0.0:4040", "advertise": "", "bootstrap": "127.0.0.1:8080", "exit": "off", "key": "relay.key" },
+  "browser": { "path": "", "gateway": "auto" }
+}

@@ -19,6 +19,64 @@ fn io_err(e: std::io::Error) -> Error {
     Error::Link(format!("tcp: {e}"))
 }
 
+// ── Knock: первый кадр соединения — доказательство знания секрета сети ──────────
+// Секрет не задан → knock выключен (открытый режим). Неверный/пустой knock → узел
+// молча роняет соединение (порт «глухой» для DPI/сканеров).
+
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
+use std::sync::OnceLock;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+type HmacSha256 = Hmac<Sha256>;
+
+const KNOCK_LEN: usize = 16;
+const KNOCK_WINDOW_SECS: u64 = 30;
+const KNOCK_READ_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// Секрет сети из `config.json` (поле `token`) или env `OVERNET_TOKEN`.
+/// Пусто = knock выключен. Читается один раз и кэшируется.
+fn network_secret() -> &'static str {
+    static SECRET: OnceLock<String> = OnceLock::new();
+    SECRET.get_or_init(|| {
+        if let Ok(content) = std::fs::read_to_string("config.json") {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(t) = v.get("token").and_then(|t| t.as_str()) {
+                    if !t.is_empty() {
+                        return t.to_string();
+                    }
+                }
+            }
+        }
+        std::env::var("OVERNET_TOKEN").unwrap_or_default()
+    })
+}
+
+fn now_unix() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// knock = HMAC-SHA256(secret, time_bucket)[..KNOCK_LEN].
+fn knock_for(secret: &[u8], bucket: u64) -> Vec<u8> {
+    let mut mac = HmacSha256::new_from_slice(secret).expect("HMAC accepts any key length");
+    mac.update(&bucket.to_be_bytes());
+    mac.finalize().into_bytes()[..KNOCK_LEN].to_vec()
+}
+
+/// Проверить knock против текущего окна ±1 (допуск рассинхрона часов).
+fn knock_valid(secret: &[u8], received: &[u8]) -> bool {
+    if received.len() != KNOCK_LEN {
+        return false;
+    }
+    let now = now_unix() / KNOCK_WINDOW_SECS;
+    [now.wrapping_sub(1), now, now + 1]
+        .iter()
+        .any(|&bucket| knock_for(secret, bucket) == received)
+}
+
 /// `Link` поверх одного TCP-соединения.
 pub struct TcpLink {
     read: Mutex<OwnedReadHalf>,
@@ -30,13 +88,24 @@ impl TcpLink {
     pub async fn connect(addr: &str) -> Result<Self> {
         let stream = TcpStream::connect(addr).await.map_err(io_err)?;
         stream.set_nodelay(true).ok();
-        Ok(Self::from_stream(stream))
+        let link = Self::from_stream(stream);
+        // Knock первым кадром (если секрет сети задан).
+        let secret = network_secret();
+        if !secret.is_empty() {
+            let knock = knock_for(secret.as_bytes(), now_unix() / KNOCK_WINDOW_SECS);
+            link.send(&knock).await?;
+        }
+        Ok(link)
     }
 
     /// Обернуть готовый поток (например, принятый сервером).
     pub fn from_stream(stream: TcpStream) -> Self {
         let (r, w) = stream.into_split();
         TcpLink { read: Mutex::new(r), write: Mutex::new(w) }
+    }
+
+    pub async fn peer_addr(&self) -> std::io::Result<std::net::SocketAddr> {
+        self.read.lock().await.peer_addr()
     }
 }
 
@@ -87,9 +156,20 @@ impl TcpListenerLink {
     }
 
     pub async fn accept(&self) -> Result<TcpLink> {
-        let (stream, _peer) = self.listener.accept().await.map_err(io_err)?;
-        stream.set_nodelay(true).ok();
-        Ok(TcpLink::from_stream(stream))
+        let secret = network_secret();
+        loop {
+            let (stream, _peer) = self.listener.accept().await.map_err(io_err)?;
+            stream.set_nodelay(true).ok();
+            let link = TcpLink::from_stream(stream);
+            if secret.is_empty() {
+                return Ok(link); // открытый режим — без knock
+            }
+            // Требуем валидный knock первым кадром; иначе молча роняем (анти-проба).
+            match tokio::time::timeout(KNOCK_READ_TIMEOUT, link.recv()).await {
+                Ok(Ok(frame)) if knock_valid(secret.as_bytes(), &frame) => return Ok(link),
+                _ => continue,
+            }
+        }
     }
 
     pub fn local_addr(&self) -> Result<std::net::SocketAddr> {
@@ -116,5 +196,16 @@ mod tests {
         client.send(b"abc").await.unwrap();
         assert_eq!(client.recv().await.unwrap(), b"abc");
         server.await.unwrap();
+    }
+
+    #[test]
+    fn knock_roundtrip_and_skew() {
+        let secret = b"net-secret";
+        let bucket = now_unix() / KNOCK_WINDOW_SECS;
+        let k = knock_for(secret, bucket);
+        assert!(knock_valid(secret, &k)); // текущее окно
+        assert!(knock_valid(secret, &knock_for(secret, bucket - 1))); // соседнее окно
+        assert!(!knock_valid(b"wrong-secret", &k)); // другой секрет
+        assert!(!knock_valid(secret, b"short")); // мусор
     }
 }

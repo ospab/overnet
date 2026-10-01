@@ -46,6 +46,23 @@ impl OnionKey {
     pub fn public(&self) -> [u8; 32] {
         self.public
     }
+
+    /// Сырые 32 байта приватного ключа — для сохранения персистентной личности.
+    pub fn secret_bytes(&self) -> [u8; 32] {
+        self.secret.to_bytes()
+    }
+
+    /// X25519 с чужим публичным ключом (для рукопожатий цепей, см. `ntor`).
+    pub(crate) fn dh(&self, public: &[u8; 32]) -> [u8; 32] {
+        self.secret.diffie_hellman(&PublicKey::from(*public)).to_bytes()
+    }
+
+    /// Восстановить ключ из 32 байт приватного ключа.
+    pub fn from_secret_bytes(bytes: [u8; 32]) -> Self {
+        let secret = StaticSecret::from(bytes);
+        let public = PublicKey::from(&secret).to_bytes();
+        OnionKey { secret, public }
+    }
 }
 
 /// KDF: общий секрет X25519 -> 32-байтный ключ AEAD (с доменным разделителем).

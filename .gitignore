@@ -22,3 +22,13 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# Рабочие конфиги: в них токен сети, адреса серверов, ключи доступа.
+# В репозитории — только config.example.json.
+/config.json
+config.json
+!config.example.json
+overnet-browser/overnet-shared/
+
+# Зависимости JS
+node_modules/

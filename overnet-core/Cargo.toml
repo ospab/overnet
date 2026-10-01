@@ -14,3 +14,7 @@ thiserror.workspace = true
 async-trait.workspace = true
 tokio.workspace = true
 snow.workspace = true
+hmac.workspace = true
+hkdf = "0.12"
+chacha20 = "0.9"
+data-encoding = "2"

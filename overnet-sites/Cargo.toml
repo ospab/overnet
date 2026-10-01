@@ -1,0 +1,20 @@
+[package]
+name = "overnet-sites"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+# Служебные сайты сети: name.ov (регистратор), search.ov, files.ov, mail.ov.
+# Обычные HTTP-серверы; в overnet их публикует `overnet service`/`overnet site`.
+
+[dependencies]
+overnet-core = { path = "../overnet-core" }
+overnet-node = { path = "../overnet-node" }
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "form", "tokio"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1"
+tokio = { workspace = true, features = ["fs"] }
+rand.workspace = true
+hex = "0.4"
+data-encoding = "2"
+sha2.workspace = true
