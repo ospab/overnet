@@ -78,11 +78,15 @@ pub fn find_browser(configured: &str) -> Result<(PathBuf, bool), String> {
             mullvad.push(h.join("Desktop/Mullvad Browser/Browser/mullvadbrowser.exe"));
         }
         for base in [env("ProgramFiles"), env("ProgramFiles(x86)")].into_iter().flatten() {
-            firefox.push(base.join("Mozilla Firefox/firefox.exe"));
+            for dir in ["Mozilla Firefox", "Firefox Developer Edition", "Firefox Nightly"] {
+                firefox.push(base.join(dir).join("firefox.exe"));
+            }
         }
     } else if cfg!(target_os = "macos") {
         mullvad.push("/Applications/Mullvad Browser.app/Contents/MacOS/mullvadbrowser".into());
-        firefox.push("/Applications/Firefox.app/Contents/MacOS/firefox".into());
+        for app in ["Firefox", "Firefox Developer Edition", "Firefox Nightly"] {
+            firefox.push(format!("/Applications/{app}.app/Contents/MacOS/firefox").into());
+        }
     } else {
         mullvad.extend(which("mullvad-browser"));
         if let Some(h) = env("HOME") {
@@ -90,7 +94,9 @@ pub fn find_browser(configured: &str) -> Result<(PathBuf, bool), String> {
             mullvad.push(h.join(".local/share/flatpak/exports/bin/net.mullvad.MullvadBrowser"));
         }
         mullvad.push("/var/lib/flatpak/exports/bin/net.mullvad.MullvadBrowser".into());
-        firefox.extend(which("firefox"));
+        for name in ["firefox", "firefox-developer-edition", "firefox-nightly"] {
+            firefox.extend(which(name));
+        }
     }
     if let Some(p) = mullvad.into_iter().find(|p| p.exists()) {
         return Ok((p, true));
