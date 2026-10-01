@@ -87,6 +87,9 @@ impl Config {
 
 /// Каталог данных overnet (ключи по умолчанию, профиль браузера, данные сайтов).
 pub fn data_dir() -> PathBuf {
+    if let Some(home) = std::env::var_os("OVERNET_HOME") {
+        return PathBuf::from(home);
+    }
     let base = if cfg!(windows) {
         std::env::var_os("LOCALAPPDATA").map(PathBuf::from)
     } else if cfg!(target_os = "macos") {

@@ -353,19 +353,24 @@ async fn run_browser(a: &Args, cfg: &Config) {
 }
 
 /// Вся сеть на одной машине: 5 релеев (последний — выход), четыре служебных
-/// сайта и шлюз. Ключи сайтов сохраняются, адреса между запусками не меняются.
+/// сайта и шлюз. Порты и ключи постоянные, поэтому адреса между запусками не
+/// меняются, а записанный конфиг годится для своих команд в другом окне.
+const DEMO_PORTS: std::ops::Range<u16> = 47401..47406;
+
 async fn demo(cfg: &Config) {
+    let dir = data_dir().join("demo");
+    std::fs::create_dir_all(&dir).unwrap_or_else(|e| die(e));
     let mut relays: Vec<RelayDesc> = Vec::new();
     let mut nodes = Vec::new();
-    for i in 0..5 {
+    for (i, port) in DEMO_PORTS.enumerate() {
         let exit = if i == 4 { ExitPolicy::Direct { allow_private: false } } else { ExitPolicy::Off };
-        let node = Node::new(OnionKey::generate(), exit.clone());
-        let l = TcpListenerLink::bind("127.0.0.1:0").await.unwrap_or_else(|e| die(e));
-        relays.push(RelayDesc {
-            pubkey: hex::encode(node.pubkey()),
-            address: l.local_addr().unwrap().to_string(),
-            exit: exit.enabled(),
-        });
+        let key = overnet_node::web::load_or_create_key(&dir.join(format!("relay{i}.key")).to_string_lossy());
+        let node = Node::new(key, exit.clone());
+        let addr = format!("127.0.0.1:{port}");
+        let l = TcpListenerLink::bind(&addr)
+            .await
+            .unwrap_or_else(|e| die(format!("{addr}: {e} — демо уже запущено в другом окне?")));
+        relays.push(RelayDesc { pubkey: hex::encode(node.pubkey()), address: addr, exit: exit.enabled() });
         let n = node.clone();
         tokio::spawn(async move { n.serve(l).await });
         nodes.push(node);
@@ -373,7 +378,6 @@ async fn demo(cfg: &Config) {
     for n in &nodes {
         n.set_directory(relays.clone());
     }
-    let dir = data_dir().join("demo");
     let mut reserved = HashMap::new();
     let mut keys = Vec::new();
     for kind in ["name", "search", "files", "mail"] {
@@ -386,6 +390,14 @@ async fn demo(cfg: &Config) {
         reserved,
         ..Config::default()
     };
+    // Конфиг для своих команд в другом окне (service, gateway, resolve…).
+    let cfg_file = dir.join("config.json");
+    let json = serde_json::json!({
+        "relays": demo_cfg.relays,
+        "reserved": demo_cfg.reserved,
+        "gateway": { "listen": cfg.gateway.listen, "clearnet": cfg.gateway.clearnet },
+    });
+    std::fs::write(&cfg_file, serde_json::to_string_pretty(&json).unwrap()).unwrap_or_else(|e| die(e));
     for (kind, key) in keys {
         let data = dir.join("sites").join(kind);
         std::fs::create_dir_all(&data).unwrap_or_else(|e| die(e));
@@ -398,7 +410,9 @@ async fn demo(cfg: &Config) {
         tokio::spawn(svc.run());
     }
     let gw = gateway(&demo_cfg, Clearnet::parse(&cfg.gateway.clearnet).unwrap_or(Clearnet::Direct)).await;
-    println!("\nдемо-сеть работает. В другом окне: overnet browser");
-    println!("или любой браузер с SOCKS5 {} и удалённым DNS.\n", cfg.gateway.listen);
+    println!("\nдемо-сеть работает. В другом окне:");
+    println!("  браузер:    overnet browser --gateway always");
+    println!("  свой сайт:  overnet service --config \"{}\" --key my.key --port 80=127.0.0.1:8080", cfg_file.display());
+    println!("  или любой браузер с SOCKS5 {} и «проксировать DNS».\n", cfg.gateway.listen);
     serve_gateway(gw, &cfg.gateway.listen).await;
 }
