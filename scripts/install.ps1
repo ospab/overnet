@@ -88,7 +88,10 @@ Expand-Archive -Path $zip -DestinationPath (Join-Path $tmp "x") -Force
 
 # 3. Установка (работающий overnet.exe останавливаем: Windows не даёт заменить открытый файл)
 New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-Stop-Process -Name "overnet" -Force -ErrorAction SilentlyContinue
+# Кроме `overnet update`, который запустил этот установщик: он ждёт его конца.
+$updater = 0
+[void][int]::TryParse("$env:OVERNET_UPDATER_PID", [ref]$updater)
+Get-Process -Name "overnet" -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne $updater } | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 500
 Get-ChildItem -Path (Join-Path $tmp "x") -File -Recurse | ForEach-Object {
     Copy-Item -Path $_.FullName -Destination (Join-Path $InstallDir $_.Name) -Force

@@ -3,6 +3,7 @@
 mod browser;
 mod config;
 mod legacy;
+mod update;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -47,6 +48,9 @@ Client:
   overnet resolve <name.ov>             what a name resolves to
 
   overnet demo                          the whole network on this machine: relays, sites, gateway
+  overnet update [--version vX.Y.Z] [--force]
+                                        install the latest release (Linux: with sudo)
+  overnet version                       installed version
   overnet legacy …                      old commands (before v0.2 circuits)
 
 Common flag: --config <file>. Without it: $OVERNET_CONFIG, then ./config.json,
@@ -93,6 +97,7 @@ fn die(msg: impl std::fmt::Display) -> ! {
 async fn main() {
     let raw: Vec<String> = std::env::args().collect();
     let cmd = raw.get(1).cloned().unwrap_or_default();
+    update::cleanup();
     if cmd == "legacy" {
         let mut rest = vec![raw[0].clone()];
         rest.extend(raw[2..].iter().cloned());
@@ -163,6 +168,8 @@ async fn main() {
             }
         }
         "demo" => demo(&cfg).await,
+        "update" => update::run(a.flag("version"), a.flags.contains_key("force")).unwrap_or_else(|e| die(e)),
+        "version" | "--version" | "-V" => println!("overnet {}", env!("CARGO_PKG_VERSION")),
         _ => println!("{HELP}"),
     }
 }
