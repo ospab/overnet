@@ -350,6 +350,9 @@ async fn run_browser(a: &Args, cfg: &Config) {
     let profile = data_dir().join("browser-profile");
     browser::write_profile(&profile, proxy.as_deref()).unwrap_or_else(|e| die(e));
     println!("browser: {}", exe.display());
+    if proxy.is_some() {
+        println!("keep this window open: the browser reaches overnet through it");
+    }
     match browser::launch(&exe, &profile).await {
         Ok(_) => {}
         Err(e) => die(format!("{}: {e}", exe.display())),

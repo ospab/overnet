@@ -178,14 +178,37 @@ pub fn write_profile(dir: &Path, proxy: Option<&str>) -> std::io::Result<()> {
 }
 
 /// Запустить браузер и дождаться, пока его закроют.
+///
+/// Запущенный процесс — плохой признак: на новом профиле (и после обновления)
+/// Firefox перезапускает сам себя, первый процесс выходит, а окно остаётся. Шлюз
+/// при этом закрываться не должен, поэтому ждём, пока браузер держит профиль.
 pub async fn launch(exe: &Path, profile: &Path) -> std::io::Result<std::process::ExitStatus> {
-    tokio::process::Command::new(exe)
+    let status = tokio::process::Command::new(exe)
         .arg("--profile")
         .arg(profile)
         .arg("--no-remote")
         .arg("http://search.ov/")
         .status()
-        .await
+        .await?;
+    // Перезапущенному браузеру нужно время, чтобы снова занять профиль.
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    while profile_in_use(profile) {
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    }
+    Ok(status)
+}
+
+/// Занят ли профиль работающим браузером.
+fn profile_in_use(profile: &Path) -> bool {
+    if cfg!(windows) {
+        // Firefox держит parent.lock открытым без права удаления: удалось
+        // удалить — браузера нет (файл он создаст заново при запуске).
+        let lock = profile.join("parent.lock");
+        lock.exists() && std::fs::remove_file(&lock).is_err()
+    } else {
+        // Ссылка `lock` есть, пока браузер работает; при выходе он её убирает.
+        std::fs::symlink_metadata(profile.join("lock")).is_ok()
+    }
 }
 
 #[cfg(test)]
