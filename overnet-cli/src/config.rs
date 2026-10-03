@@ -77,9 +77,11 @@ impl Config {
         }
     }
 
+    /// Релеи из конфига, а если их нет — стартовые релеи сети.
     pub fn relays(&self) -> Result<Vec<RelayDesc>, String> {
-        self.relays
-            .iter()
+        let own: Vec<&str> = self.relays.iter().map(String::as_str).collect();
+        let list = if own.is_empty() { overnet_node::net::names::SEED_RELAYS } else { &own[..] };
+        list.iter()
             .map(|r| RelayDesc::parse(r).ok_or_else(|| format!("relays: '{r}' is not pubkeyhex@host:port")))
             .collect()
     }

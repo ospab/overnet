@@ -257,11 +257,8 @@ fi
 # -- Next steps ---------------------------------------------------------
 
 echo "--------------------------------------------------------"
-if [ "$FIRST_INSTALL" -eq 1 ] && [ -z "$CONFIG_URL" ]; then
-    echo "Fill in $CONFIG_FILE: \"relays\" (pubkey@host:port of the network's relays)"
-    echo "and \"reserved\" (addresses of name.ov, search.ov, mail.ov, files.ov, source.ov)."
-    echo "Get both from whoever runs the network, or run: overnet demo"
-fi
+echo "The network's relays and service addresses are built in; $CONFIG_FILE"
+echo "only needs changes for a network of your own."
 for role in "${ROLES[@]}"; do
     [ "$role" = relay ] && echo "Relay line for client configs: journalctl -u overnet-relay | grep -m1 @"
 done

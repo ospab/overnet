@@ -114,10 +114,7 @@ if ($first) {
 }
 
 Write-Host "--------------------------------------------------------"
-if ($first -and -not $ConfigUrl) {
-    Write-Host "Fill in $ConfigFile`: `"relays`" (pubkey@host:port of the network's relays)"
-    Write-Host "and `"reserved`" (addresses of name.ov, search.ov, mail.ov, files.ov, source.ov)."
-    Write-Host "Get both from whoever runs the network, or try it locally: overnet demo"
-}
+Write-Host "The network's relays and service addresses are built in; $ConfigFile"
+Write-Host "only needs changes for a network of your own."
 Write-Host "Open a new terminal, then: overnet browser    Help: overnet help"
 Write-Host "--------------------------------------------------------"

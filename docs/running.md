@@ -65,6 +65,11 @@ irm https://raw.githubusercontent.com/ospab/overnet/master/scripts/install.ps1 |
 конфиг — `%LOCALAPPDATA%\overnet\config.json`. С параметрами:
 `& ([scriptblock]::Create((irm …/install.ps1))) -ConfigUrl https://…/config.json`.
 
+Релеи и адреса служебных сайтов основной сети вшиты в программу (`SEED_RELAYS` и
+`PINNED` в `overnet-node/src/net/names.rs`), так что клиенту конфиг не нужен:
+`overnet browser` работает сразу после установки. `relays` и `reserved` в
+конфиге нужны только для своей сети — они перекрывают вшитые значения.
+
 Без `--config` overnet ищет конфиг так: `$OVERNET_CONFIG`, `./config.json`,
 `config.json` в каталоге данных, `/etc/overnet/config.json`.
 
@@ -186,6 +191,14 @@ curl -fsSL …/install.sh | sudo bash -s -- --role service:source:3000
 http://source.ov/ospab/overnet.git` (`socks5h` — чтобы имя резолвил шлюз).
 
 ## Вместе с ostp
+
+overnet в ostp **никогда не включается по умолчанию**: секция `overnet` на
+сервере ostp выключена, установщик ostp overnet не ставит. Владелец сервера
+включает её сам (с ostp 0.4.7, канал alpha) и сам ставит шлюз:
+`install.sh --role gateway`. Если entry включён, а шлюза нет, `.ov` у клиентов
+падает с ошибкой «connection refused» — это ошибка настройки, не тихое
+отключение. В режиме TUN `name.ov` получает адрес из 198.18.0.0/15 только при
+включённом entry, на этом и строится детект в `overnet browser`.
 
 На сервере ostp рядом с ним запускаются шлюз и (по желанию) релей-выход overnet:
 

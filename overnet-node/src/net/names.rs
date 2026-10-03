@@ -22,9 +22,22 @@ use super::client::Client;
 /// исходный код самого overnet (Gitea).
 pub const RESERVED: [&str; 5] = ["name.ov", "search.ov", "mail.ov", "files.ov", "source.ov"];
 
-/// Адреса официальных сервисов. Пусто, пока они не подняты: до тех пор адреса
-/// берутся из `reserved` в конфиге.
-pub const PINNED: &[(&str, &str)] = &[];
+/// Адреса официальных сервисов сети. `reserved` в конфиге их перекрывает
+/// (своя сеть, `overnet demo`).
+pub const PINNED: &[(&str, &str)] = &[
+    ("name.ov", "cyprub3k5zzihweug4i7v7gafxisuqnrqvw4qch7kmrhgnny5sil2rab.ov"),
+    ("search.ov", "kd5vfzijxxooolgcw45catledp2oc3tqd3aemyuu6y6xnrbal26y33ib.ov"),
+    ("mail.ov", "xgtpz5xt7yf6elvkt2wubzumhfww772xcngcta5fxyeitrfqqw6ma4yb.ov"),
+    ("files.ov", "2iasoxxypoy7q3zpo7xb4iagxa7uf6ttnlyo5f33ffshcgcsbkuxd5ib.ov"),
+    ("source.ov", "4f6d2br4fxr7dq2c5rqozo44je6taqvy3or22pir76u4wvryplvxjlqb.ov"),
+];
+
+/// Стартовые релеи сети: с них клиент берёт каталог, если в конфиге своих нет.
+pub const SEED_RELAYS: &[&str] = &[
+    "f7d575b796aa434f05f72ed54ffdeebde43880d0e2b5ea64e7e97952c2de0f2d@138.124.241.23:4040",
+    "111293d0ba0887e24d70a5f8a188bf2f7f0af0174692c7641264690f035b056d@138.124.71.217:4040",
+    "185466dd00430796123d49d4cb8976987d144e75208ae90d0766bda810739d60@138.124.241.18:4040",
+];
 
 const CACHE_TTL: Duration = Duration::from_secs(600);
 
@@ -155,6 +168,18 @@ pub async fn http_get(client: &Client, id: ServiceId, path: &str) -> Result<(u16
 mod tests {
     use super::*;
     use overnet_core::ovaddr::ServiceKey;
+
+    #[test]
+    fn built_in_network_is_well_formed() {
+        for (n, a) in PINNED {
+            assert!(RESERVED.contains(n), "{n} is pinned but not reserved");
+            assert!(ServiceId::from_address(a).is_ok(), "{n}: bad address {a}");
+        }
+        assert_eq!(PINNED.len(), RESERVED.len(), "every reserved name has an address");
+        for r in SEED_RELAYS {
+            assert!(super::super::dir::RelayDesc::parse(r).is_some(), "bad seed relay {r}");
+        }
+    }
 
     #[test]
     fn names() {

@@ -331,9 +331,6 @@ async fn run_browser(a: &Args, cfg: &Config) {
             if browser::gateway_running(&listen).await {
                 println!("gateway already running on {listen}");
             } else {
-                if cfg.relays.is_empty() {
-                    die("no relays in the config (\"relays\") and no ostp with overnet; to try it out, run `overnet demo`");
-                }
                 let clearnet = Clearnet::parse(&cfg.gateway.clearnet).unwrap_or_else(|e| die(e));
                 let gw = gateway(cfg, clearnet).await;
                 let l = tokio::net::TcpListener::bind(&listen).await.unwrap_or_else(|e| die(format!("{listen}: {e}")));
