@@ -97,6 +97,23 @@ impl Client {
         g.clone()
     }
 
+    /// «Новая личность»: забыть вход, склейки с сервисами и цепь к выходу.
+    /// Следующие соединения строятся с нуля, через новые цепи.
+    pub async fn new_identity(&self) {
+        self.forget_guard();
+        let rend: Vec<_> = self.rend.lock().await.drain().map(|(_, c)| c).collect();
+        let exit = self.exit_circ.lock().await.take();
+        for c in rend.into_iter().chain(exit.map(|(c, _)| c)) {
+            c.destroy().await;
+        }
+    }
+
+    /// Сколько релеев в каталоге и сколько из них — выходы.
+    pub fn directory_size(&self) -> (usize, usize) {
+        let d = self.node.directory();
+        (d.len(), d.iter().filter(|r| r.exit).count())
+    }
+
     fn forget_guard(&self) {
         *self.guard.lock().unwrap() = None;
     }

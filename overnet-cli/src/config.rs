@@ -60,13 +60,22 @@ impl Default for RelayCfg {
     }
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize)]
 #[serde(default)]
 pub struct BrowserCfg {
-    /// Путь к Mullvad Browser (если не нашёлся сам).
+    /// Путь к браузеру (если не нашёлся сам).
     pub path: String,
     /// auto | always | never — поднимать ли локальный шлюз.
     pub gateway: String,
+    /// block | exit | direct — обычные сайты в браузере overnet. По умолчанию
+    /// закрыты: прямое соединение выдало бы IP рядом с визитами на .ov.
+    pub clearnet: String,
+}
+
+impl Default for BrowserCfg {
+    fn default() -> Self {
+        BrowserCfg { path: String::new(), gateway: String::new(), clearnet: "block".into() }
+    }
 }
 
 impl Config {

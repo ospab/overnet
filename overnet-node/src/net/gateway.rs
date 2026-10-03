@@ -6,7 +6,8 @@
 //! Имена браузер должен отдавать шлюзу (socks5h / remote DNS), иначе `.ov`
 //! утечёт в системный DNS — профиль браузера это включает.
 
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::collections::HashMap;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -41,6 +42,9 @@ pub struct Gateway {
     pub client: Arc<Client>,
     pub names: Arc<Names>,
     pub clearnet: Clearnet,
+    /// Имена, которые обслуживаются на этой машине (`browser.ov` → loopback-
+    /// сервер страниц браузера), только порт 80: в сеть они не уходят.
+    pub local: HashMap<String, SocketAddr>,
 }
 
 impl Gateway {
@@ -96,6 +100,21 @@ impl Gateway {
         let mut p = [0u8; 2];
         tcp.read_exact(&mut p).await.map_err(io)?;
         let port = u16::from_be_bytes(p);
+
+        if let Some(addr) = self.local.get(&host.to_ascii_lowercase()) {
+            // Только http: https-first браузера сразу откатится на http.
+            if port != 80 {
+                return reply(&mut tcp, 2).await;
+            }
+            return match TcpStream::connect(addr).await {
+                Ok(mut up) => {
+                    reply(&mut tcp, 0).await?;
+                    let _ = tokio::io::copy_bidirectional(&mut tcp, &mut up).await;
+                    Ok(())
+                }
+                Err(_) => reply(&mut tcp, 5).await,
+            };
+        }
 
         if is_ov(&host) {
             let res = async {

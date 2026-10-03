@@ -17,7 +17,7 @@ use axum::{Form, Json, Router};
 use serde::Deserialize;
 use tokio::sync::RwLock;
 
-use overnet_node::net::names::{valid_name, NameRecord, RESERVED};
+use overnet_node::net::names::{valid_name, NameRecord, LOCAL, RESERVED};
 
 use crate::{esc, load_json, save_json, Site};
 
@@ -43,7 +43,7 @@ impl Registrar {
         if rec.name != name || !valid_name(&name) {
             return Err((StatusCode::BAD_REQUEST, "name: lowercase latin letters, digits and hyphens, like shop.ov".into()));
         }
-        if RESERVED.contains(&name.as_str()) {
+        if RESERVED.contains(&name.as_str()) || LOCAL.contains(&name.as_str()) {
             return Err((StatusCode::FORBIDDEN, "this name is reserved for a network service".into()));
         }
         let Some(id) = rec.verify() else {

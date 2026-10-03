@@ -1,6 +1,7 @@
 //! `overnet` — командная строка сети.
 
 mod browser;
+mod browser_ui;
 mod config;
 mod legacy;
 mod update;
@@ -57,6 +58,9 @@ Common flag: --config <file>. Without it: $OVERNET_CONFIG, then ./config.json,
 then config.json in the data directory, then /etc/overnet/config.json.";
 
 /// Флаги вида `--имя значение`; повторяемые копятся.
+/// Флаги без значения: следующее слово остаётся само по себе.
+const SWITCHES: &[&str] = &["browser", "exit-with-stdin", "force"];
+
 struct Args {
     pos: Vec<String>,
     flags: HashMap<String, Vec<String>>,
@@ -69,6 +73,7 @@ impl Args {
         let mut it = raw.iter();
         while let Some(a) = it.next() {
             match a.strip_prefix("--") {
+                Some(k) if SWITCHES.contains(&k) => flags.entry(k.to_string()).or_default().push(String::new()),
                 Some(k) => {
                     let v = it.next().cloned().unwrap_or_default();
                     flags.entry(k.to_string()).or_default().push(v);
@@ -153,8 +158,14 @@ async fn main() {
         "site" => site(&a, &cfg).await,
         "gateway" => {
             let listen = a.flag("listen").unwrap_or(&cfg.gateway.listen).to_string();
-            let clearnet = Clearnet::parse(a.flag("clearnet").unwrap_or(&cfg.gateway.clearnet)).unwrap_or_else(|e| die(e));
-            let gw = gateway(&cfg, clearnet).await;
+            // --browser: шлюз браузера overnet (его запускает сам браузер).
+            let for_browser = a.flags.contains_key("browser");
+            let default = if for_browser { &cfg.browser.clearnet } else { &cfg.gateway.clearnet };
+            let clearnet = Clearnet::parse(a.flag("clearnet").unwrap_or(default)).unwrap_or_else(|e| die(e));
+            if a.flags.contains_key("exit-with-stdin") {
+                exit_with_stdin();
+            }
+            let gw = gateway(&cfg, clearnet, for_browser).await;
             serve_gateway(gw, &listen).await;
         }
         "browser" => run_browser(&a, &cfg).await,
@@ -295,7 +306,20 @@ async fn serve_http(app: axum::Router, listen: &str) -> String {
     addr
 }
 
-async fn gateway(cfg: &Config, clearnet: Clearnet) -> Arc<Gateway> {
+/// Выйти, когда закроется stdin: браузер держит трубу открытой, пока жив, и
+/// шлюз не переживёт его, даже если браузер упадёт.
+fn exit_with_stdin() {
+    std::thread::spawn(|| {
+        let mut buf = [0u8; 256];
+        let mut stdin = std::io::stdin();
+        while matches!(std::io::Read::read(&mut stdin, &mut buf), Ok(n) if n > 0) {}
+        std::process::exit(0);
+    });
+}
+
+/// `open_external` — страницы browser.ov могут открыть сайт в обычном браузере
+/// этой машины (шлюз запущен для браузера, а не на сервере).
+async fn gateway(cfg: &Config, clearnet: Clearnet, open_external: bool) -> Arc<Gateway> {
     let c = client(cfg);
     let names = Names::new(c.clone(), &cfg.reserved).unwrap_or_else(|e| die(e));
     match c.refresh_directory().await {
@@ -307,7 +331,10 @@ async fn gateway(cfg: &Config, clearnet: Clearnet) -> Arc<Gateway> {
     if !missing.is_empty() {
         eprintln!("addresses not set: {} (the \"reserved\" section of the config)", missing.join(", "));
     }
-    Arc::new(Gateway { client: c, names, clearnet })
+    let ui = Arc::new(browser_ui::Ui::new(c.clone(), clearnet, open_external));
+    let ui_addr = serve_http(browser_ui::router(ui), "127.0.0.1:0").await;
+    let local = [("browser.ov".to_string(), ui_addr.parse().expect("loopback address"))].into_iter().collect();
+    Arc::new(Gateway { client: c, names, clearnet, local })
 }
 
 async fn serve_gateway(gw: Arc<Gateway>, listen: &str) {
@@ -338,8 +365,8 @@ async fn run_browser(a: &Args, cfg: &Config) {
             if browser::gateway_running(&listen).await {
                 println!("gateway already running on {listen}");
             } else {
-                let clearnet = Clearnet::parse(&cfg.gateway.clearnet).unwrap_or_else(|e| die(e));
-                let gw = gateway(cfg, clearnet).await;
+                let clearnet = Clearnet::parse(&cfg.browser.clearnet).unwrap_or_else(|e| die(e));
+                let gw = gateway(cfg, clearnet, true).await;
                 let l = tokio::net::TcpListener::bind(&listen).await.unwrap_or_else(|e| die(format!("{listen}: {e}")));
                 tokio::spawn(gw.serve(l));
                 println!("gateway: socks5://{listen}");
@@ -420,10 +447,24 @@ async fn demo(cfg: &Config) {
         println!("{kind}.ov  {}  (intro points: {up}, local http://{local})", svc.id().to_address());
         tokio::spawn(svc.run());
     }
-    let gw = gateway(&demo_cfg, Clearnet::parse(&cfg.gateway.clearnet).unwrap_or(Clearnet::Direct)).await;
+    let gw = gateway(&demo_cfg, Clearnet::parse(&cfg.gateway.clearnet).unwrap_or(Clearnet::Direct), true).await;
     println!("\nthe demo network is up. In another window:");
     println!("  browser:    overnet browser --gateway always");
     println!("  your site:  overnet service --config \"{}\" --key my.key --port 80=127.0.0.1:8080", cfg_file.display());
     println!("  or any browser with SOCKS5 {} and \"proxy DNS\" on.\n", cfg.gateway.listen);
     serve_gateway(gw, &cfg.gateway.listen).await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Args;
+
+    #[test]
+    fn switches_take_no_value() {
+        let raw: Vec<String> = ["--browser", "--listen", "127.0.0.1:1", "--force", "x"].iter().map(|s| s.to_string()).collect();
+        let a = Args::parse(&raw);
+        assert!(a.flags.contains_key("browser") && a.flags.contains_key("force"));
+        assert_eq!(a.flag("listen"), Some("127.0.0.1:1"));
+        assert_eq!(a.pos, vec!["x"]);
+    }
 }

@@ -22,6 +22,10 @@ use super::client::Client;
 /// исходный код самого overnet (Gitea).
 pub const RESERVED: [&str; 5] = ["name.ov", "search.ov", "mail.ov", "files.ov", "source.ov"];
 
+/// Имена, которые обслуживает сам шлюз на этой машине (`browser.ov` — страницы
+/// браузера). В сеть они не уходят, и зарегистрировать их нельзя.
+pub const LOCAL: [&str; 1] = ["browser.ov"];
+
 /// Адреса официальных сервисов сети. `reserved` в конфиге их перекрывает
 /// (своя сеть, `overnet demo`).
 pub const PINNED: &[(&str, &str)] = &[
@@ -112,6 +116,9 @@ impl Names {
         let name = base_name(host);
         if let Some(id) = self.reserved.get(&name) {
             return Ok(*id);
+        }
+        if LOCAL.contains(&name.as_str()) {
+            return Err(Error::Link(format!("{name} is served by the local gateway only")));
         }
         if RESERVED.contains(&name.as_str()) {
             return Err(Error::Link(format!("{name} is reserved but its address is not configured")));

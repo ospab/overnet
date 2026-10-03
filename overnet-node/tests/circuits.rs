@@ -173,7 +173,7 @@ async fn socks_gateway_opens_reserved_name() {
 
     let c = client(&descs[0]);
     let names = Names::new(c.clone(), &HashMap::from([("search.ov".to_string(), addr)])).unwrap();
-    let gw = Arc::new(Gateway { client: c, names, clearnet: Clearnet::Block });
+    let gw = Arc::new(Gateway { client: c, names, clearnet: Clearnet::Block, local: Default::default() });
     let l = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let gw_addr = l.local_addr().unwrap();
     tokio::spawn(gw.serve(l));
