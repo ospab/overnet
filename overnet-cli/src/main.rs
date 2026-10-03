@@ -322,9 +322,16 @@ fn exit_with_stdin() {
 async fn gateway(cfg: &Config, clearnet: Clearnet, open_external: bool) -> Arc<Gateway> {
     let c = client(cfg);
     let names = Names::new(c.clone(), &cfg.reserved).unwrap_or_else(|e| die(e));
-    match c.refresh_directory().await {
-        Ok(n) => println!("directory: {n} relays"),
-        Err(e) => eprintln!("directory not available yet ({e}); will retry on the first request"),
+    // Каталог — в фоне: шлюз слушает порт сразу, и первая страница браузера не
+    // упирается в «прокси отказал». Запросы до каталога дождутся его сами.
+    {
+        let c = c.clone();
+        tokio::spawn(async move {
+            match c.refresh_directory().await {
+                Ok(n) => println!("directory: {n} relays"),
+                Err(e) => eprintln!("directory not available yet ({e}); will retry on the first request"),
+            }
+        });
     }
     c.spawn_directory_refresh(Duration::from_secs(600));
     let missing: Vec<&str> = RESERVED.iter().copied().filter(|n| !names.reserved().contains_key(*n)).collect();
