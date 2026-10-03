@@ -87,16 +87,25 @@ impl Node {
             Ok(keys) => circ.push_hop(&keys).await,
             Err(e) => {
                 circ.destroy().await;
-                return Err(e);
+                return Err(at_hop(e, first));
             }
         }
         for hop in &path[1..] {
             if let Err(e) = circ.extend(hop).await {
                 circ.destroy().await;
-                return Err(e);
+                return Err(at_hop(e, hop));
             }
         }
         Ok(circ)
+    }
+}
+
+/// Ошибка шага цепи с адресом релея: без него «ntor: server authentication
+/// failed» не говорит, какой релей ответил чужим ключом.
+fn at_hop(e: Error, hop: &RelayDesc) -> Error {
+    match e {
+        Error::Link(m) => Error::Link(format!("{m} (relay {}…@{})", &hop.pubkey[..16.min(hop.pubkey.len())], hop.address)),
+        other => other,
     }
 }
 
