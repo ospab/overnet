@@ -73,7 +73,12 @@ try {
     exit 1
 }
 $expected = ""
-try { $expected = ([string](Invoke-WebRequest -Uri "$url.sha256" -UseBasicParsing).Content -split "\s+")[0] } catch { }
+# Через файл: Windows PowerShell 5.1 отдаёт .Content для octet-stream массивом байтов.
+$sumFile = "$zip.sha256"
+try {
+    Invoke-WebRequest -Uri "$url.sha256" -OutFile $sumFile -UseBasicParsing
+    $expected = ((Get-Content $sumFile -Raw).Trim() -split "\s+")[0]
+} catch { }
 if ($expected) {
     if ($expected -ne (Get-FileHash $zip -Algorithm SHA256).Hash) { Write-Error "Checksum mismatch for $archive." }
     Write-Host "Checksum OK."
