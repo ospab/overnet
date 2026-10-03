@@ -1,7 +1,7 @@
 {
   "name": "overnet-electron-browser",
   "version": "0.0.1",
-  "description": "Минимальный браузер overnet на Electron (Chromium).",
+  "description": "Minimal overnet browser on Electron (Chromium).",
   "main": "main.js",
   "scripts": {
     "start": "electron ."

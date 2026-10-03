@@ -1,107 +1,108 @@
-# Модель угроз overnet
+# overnet threat model
 
-*Версия 0.1 — 2026-06-23. Без этого документа весь остальной дизайн — гадание.*
+*Version 0.1 — 2026-06-23. Without this document the rest of the design is guesswork.*
 
 ---
 
-Модель угроз отвечает на три вопроса: **от кого** защищаемся, **что он умеет**, и
-что мы **честно не защищаем**. Любое архитектурное решение должно ссылаться сюда.
+A threat model answers three questions: **who** we defend against, **what they
+can do**, and what we **honestly do not protect**. Every architectural decision
+must refer back here.
 
-## 1. Противники
+## 1. Adversaries
 
-### A. Государственный сетевой цензор (главный) — «ТСПУ»
-Оператор DPI на уровне страны/провайдера. Цель — не дать связи выйти за пределы
-контролируемого периметра и/или подавить неугодный обмен внутри.
+### A. A state network censor (the main one) — national DPI
+A DPI operator at the country / provider level. Goal: keep communication from
+leaving the controlled perimeter and/or suppress unwanted exchange inside it.
 
-### B. Локальный провайдер под принуждением
-Видит трафик конкретного абонента, может его формировать/резать, обязан
-сотрудничать с A и логировать.
+### B. A local provider under coercion
+Sees a specific subscriber's traffic, can shape or cut it, is obliged to
+cooperate with A and keep logs.
 
-### C. Злонамеренные узлы внутри сети (Sybil/инфильтрация)
-Противник запускает свои узлы overnet, чтобы деанонить участников, картировать
-топологию, рвать или перехватывать маршруты.
+### C. Malicious nodes inside the network (Sybil / infiltration)
+The adversary runs its own overnet nodes to deanonymize participants, map the
+topology, and break or intercept routes.
 
-### D. Физический преследователь (только фаза 3)
-Может пеленговать радиоизлучение, физически найти и изъять передатчик/узел,
-прийти к оператору.
+### D. A physical pursuer (phase 3 only)
+Can direction-find radio emissions, physically locate and seize a transmitter or
+node, and visit the operator.
 
-## 2. Что умеет противник A (ТСПУ) — по нарастанию жёсткости
+## 2. What adversary A (DPI) can do — in increasing severity
 
-1. **Блокировка по IP/подсетям** — чёрные списки адресов.
-2. **Блокировка по SNI** — читает имя сайта в открытом TLS ClientHello. Сейчас
-   это главный инструмент. (Ответ индустрии — ECH, шифрование SNI.)
-3. **Фингерпринтинг протокола** — JA3/JA4 по TLS-хендшейку, сигнатуры известных
-   VPN/прокси (OpenVPN, WireGuard, обфускаторы).
-4. **Активное зондирование** — увидев подозрительное соединение, сам стучится на
-   тот же адрес/порт, проверяя, не прокси ли это.
-5. **Анализ трафика** — размеры пакетов, тайминги, объёмы, fan-in/fan-out,
-   **энтропия**. Высокоэнтропийный поток без узнаваемого хендшейка флагируется
-   как «неизвестное шифро» сам по себе.
-6. **Whitelist-режим (эндгейм)** — пропускается только положительно опознанное
-   как разрешённое; всё остальное дропается по умолчанию. **Это убивает любой
-   оверлей, который лишь «выглядит случайно».** Поэтому фаза 1 должна *мимикрировать
-   под разрешённое* (Reality → настоящий TLS к настоящему сайту), а не просто
-   шифроваться.
-7. **Контроль трансграничных стыков / закрытие границы** — изоляция RuNet.
-   Убивает любой выход за периметр на уровне канала. **Главный аргумент за
-   фазы 2–3.**
+1. **Blocking by IP / subnet** — address blacklists.
+2. **Blocking by SNI** — reads the site name in the cleartext TLS ClientHello.
+   Currently the main tool. (The industry's answer is ECH, encrypted SNI.)
+3. **Protocol fingerprinting** — JA3/JA4 from the TLS handshake, signatures of
+   known VPNs / proxies (OpenVPN, WireGuard, obfuscators).
+4. **Active probing** — on seeing a suspicious connection, it connects to the
+   same address / port itself to check whether it is a proxy.
+5. **Traffic analysis** — packet sizes, timings, volumes, fan-in / fan-out,
+   **entropy**. A high-entropy stream without a recognizable handshake is
+   flagged as "unknown crypto" on its own.
+6. **Whitelist mode (the endgame)** — only traffic positively identified as
+   permitted passes; everything else is dropped by default. **This kills any
+   overlay that merely "looks random".** So phase 1 has to *mimic what is
+   permitted*, not just be encrypted.
+7. **Controlling cross-border links / closing the border** — isolating the
+   national internet. Kills any way out of the perimeter at the channel level.
+   **The main argument for phases 2–3.**
 
-## 3. Что overnet защищает (цели безопасности)
+## 3. What overnet protects (security goals)
 
-| Свойство | Фаза 1 | Фаза 2 | Фаза 3 |
-|----------|:------:|:------:|:------:|
-| Конфиденциальность содержимого | ✅ | ✅ | ✅ |
-| Приватность метаданных (кто с кем) | частично | ✅ (onion) | ✅ (onion) |
-| Доступность при блокировке IP/SNI | ✅ (мимикрия) | ✅ | ✅ |
-| Выживание при whitelist-режиме | ⚠️ зависит от качества мимикрии | ⚠️ если есть хоть один трансгран. линк | ✅ |
-| Выживание при закрытой границе | ❌ | ❌ (без своих линков) | ✅ |
-| Нет единой точки отказа | ⚠️ | ✅ | ✅ |
-| Сопротивление Sybil | — | ⚠️ (F2F помогает) | ✅ (физ. соседство) |
+| Property | Phase 1 | Phase 2 | Phase 3 |
+|----------|:-------:|:-------:|:-------:|
+| Content confidentiality | ✅ | ✅ | ✅ |
+| Metadata privacy (who talks to whom) | partial | ✅ (onion) | ✅ (onion) |
+| Availability under IP/SNI blocking | ✅ (mimicry) | ✅ | ✅ |
+| Survival under whitelist mode | ⚠️ depends on mimicry quality | ⚠️ if at least one cross-border link exists | ✅ |
+| Survival with the border closed | ❌ | ❌ (without own links) | ✅ |
+| No single point of failure | ⚠️ | ✅ | ✅ |
+| Sybil resistance | — | ⚠️ (F2F helps) | ✅ (physical proximity) |
 
-Чтение: чем дальше по фазам, тем меньше зависимость от инфраструктуры противника.
+How to read it: the further along the phases, the less we depend on the
+adversary's infrastructure.
 
-## 4. Что мы честно НЕ защищаем (границы)
+## 4. What we honestly do NOT protect (the limits)
 
-Сеть, которая врёт о своих гарантиях, опаснее её отсутствия.
+A network that lies about its guarantees is more dangerous than no network.
 
-- **Глобальный пассивный наблюдатель с идеальной корреляцией трафика.**
-  Если противник видит *одновременно* вход и выход и умеет коррелировать тайминги
-  по всей сети — onion-маршрутизация не спасает. Этого не решает и Tor. Частичная
-  защита — миксети (задержки + cover traffic, Loopix/Nym), но это дорого и пока
-  вне первого контура.
-- **Компрометация конечного устройства.** Если телефон/ПК участника заражён —
-  крипта на проводе бессмысленна. Это вне зоны overnet.
-- **Физический захват узла (фаза 3).** Найденный передатчик можно изъять и
-  изучить. Дизайн должен ограничивать, что узел *знает* (F2F: знает только
-  соседей), чтобы изъятие одного не раскрывало сеть.
-- **Защита персонально таргетированного участника.** Если противник прицельно
-  занимается *конкретным* человеком (физ. слежка, изъятие, принуждение) —
-  это вне модели; overnet защищает связь, а не личную безопасность оператора от
-  адресных мер.
-- **Анонимность отправителя радиосигнала (фаза 3).** Радио пеленгуется. Физическая
-  неблокируемость покупается ценой обнаружимости передатчика. Это закладывается
-  честно: мощность, направленность, deniability — параметры дизайна, а не
-  обещание невидимости.
+- **A global passive observer with perfect traffic correlation.**
+  If the adversary sees entry and exit *at the same time* and can correlate
+  timings across the whole network, onion routing does not save you. Tor does
+  not solve this either. Partial protection is mixnets (delays + cover traffic,
+  Loopix / Nym), but that is expensive and outside the first iteration.
+- **A compromised end device.** If the participant's phone or PC is infected,
+  crypto on the wire is meaningless. This is outside overnet's scope.
+- **Physical capture of a node (phase 3).** A found transmitter can be seized
+  and examined. The design must limit what a node *knows* (F2F: only its
+  neighbours) so that seizing one does not expose the network.
+- **Protecting a personally targeted participant.** If the adversary goes after
+  a *specific* person (physical surveillance, seizure, coercion), that is outside
+  the model; overnet protects communication, not the operator's personal safety
+  against targeted measures.
+- **Anonymity of a radio transmitter (phase 3).** Radio can be direction-found.
+  Physical unblockability is bought with the transmitter's detectability. This
+  is stated honestly: power, directionality and deniability are design
+  parameters, not a promise of invisibility.
 
-## 5. Следствия для дизайна
+## 5. Consequences for the design
 
-Каждое — прямой вывод из пунктов выше:
+Each one follows directly from the points above:
 
-1. **Шифрование по умолчанию, метаданные — первоклассная цель** (против A, C).
-2. **Фаза 1 маскируется, а не «шифрует конверт»** — иначе whitelist дропнет по
-   форме (п. 2.6).
-3. **Фазы 2–3 не зависят от выхода в clearnet** — иначе закрытие границы (п. 2.7)
-   убивает сеть.
-4. **F2F-топология** — против Sybil/инфильтрации (C) и для ограничения знаний узла
-   при изъятии (D).
-5. **Узел знает только соседей** (onion + F2F) — чтобы компрометация одного не
-   обрушивала анонимность остальных.
-6. **Никаких центральных точек** (адрес из ключа, нет DNS/RIR/BGP) — чтобы не было
-   рычага, который противник может отобрать или принудить.
+1. **Encryption by default; metadata as a first-class goal** (against A, C).
+2. **Phase 1 disguises rather than "encrypting the envelope"** — otherwise a
+   whitelist drops it by its shape (item 2.6).
+3. **Phases 2–3 do not depend on a way out to the clearnet** — otherwise closing
+   the border (item 2.7) kills the network.
+4. **F2F topology** — against Sybil / infiltration (C) and to limit what a node
+   knows when seized (D).
+5. **A node knows only its neighbours** (onion + F2F) — so compromising one does
+   not collapse everyone else's anonymity.
+6. **No central points** (address from key, no DNS / RIR / BGP) — so there is no
+   lever the adversary can seize or coerce.
 
-## 6. Открытое
+## 6. Open
 
-- Точная граница между F2F-ядром и opennet-рёбрами (доверие vs рост).
-- Нужны ли миксет-задержки в базовом контуре или как опция для особо
-  чувствительного трафика.
-- Модель угроз для именования (petnames) — отдельная подзадача.
+- The exact boundary between the F2F core and opennet edges (trust vs growth).
+- Whether mixnet delays belong in the baseline or as an option for especially
+  sensitive traffic.
+- A threat model for naming (petnames) — a separate sub-task.

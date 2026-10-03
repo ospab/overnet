@@ -104,8 +104,8 @@ pub fn find_browser(configured: &str) -> Result<(PathBuf, bool), String> {
     if let Some(p) = firefox.into_iter().find(|p| p.exists()) {
         return Ok((p, false));
     }
-    Err("Mullvad Browser не найден. Установите его с https://mullvad.net/browser \
-         или укажите путь в config.json: \"browser\": {\"path\": \"…\"}"
+    Err("Mullvad Browser not found. Install it from https://mullvad.net/browser \
+         or set its path in config.json: \"browser\": {\"path\": \"…\"}"
         .into())
 }
 
@@ -138,11 +138,13 @@ pub fn user_js(proxy: Option<&str>) -> String {
     set("dom.security.https_only_mode_pbm", "false");
     set("dom.security.https_first", "true");
     set("dom.security.https_first_pbm", "true");
-    // Шифрование в браузере (WebCrypto) — только в «безопасном контексте».
-    set("dom.securecontext.allowlist", "\"name.ov,search.ov,mail.ov,files.ov\"");
+    // Шифрование в браузере (WebCrypto) — только в «безопасном контексте». Нужно
+    // одной почте; остальные сайты в списке давали бы предупреждение Firefox
+    // «форма уходит с безопасной страницы на небезопасную» при каждом поиске.
+    set("dom.securecontext.allowlist", "\"mail.ov\"");
     set("toolkit.legacyUserProfileCustomizations.stylesheets", "true");
     set("browser.search.suggest.enabled", "false");
-    let mut out = String::from("// overnet: этот файл перезаписывается при каждом запуске `overnet browser`.\n");
+    let mut out = String::from("// overnet: this file is rewritten every time `overnet browser` starts.\n");
     for (k, v) in p {
         out += &format!("user_pref(\"{k}\", {v});\n");
     }

@@ -43,9 +43,9 @@ app.whenReady().then(() => {
     } catch (e) {
       return new Response(
         `<body style="font-family:sans-serif;padding:2rem">
-           <h1>overnet недоступен</h1>
-           <p>Локальный шлюз <code>${GATEWAY}</code> не отвечает.</p>
-           <p>Запущен ли <code>overnet gateway</code> и узлы (bootstrap + service)?</p>
+           <h1>overnet is unavailable</h1>
+           <p>The local gateway <code>${GATEWAY}</code> is not answering.</p>
+           <p>Are <code>overnet gateway</code> and the nodes (bootstrap + service) running?</p>
            <pre>${e}</pre>
          </body>`,
         { status: 502, headers: { 'content-type': 'text/html; charset=utf-8' } }

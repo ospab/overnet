@@ -30,6 +30,44 @@
 чужим ключом) в v0.2 не существует: точку входа сервис занимает подписью,
 привязанной к конкретной цепи.
 
+## Установка
+
+Готовые сборки лежат в релизах GitHub (собирает `.github/workflows/release.yml`
+по тегу `v*`). Linux и macOS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ospab/overnet/master/scripts/install.sh | sudo bash
+```
+
+Бинарник — `/opt/overnet/overnet` (ссылка `/usr/local/bin/overnet`), конфиг —
+`/etc/overnet/config.json`, данные сервисов — `/var/lib/overnet`. Повторный
+запуск обновляет бинарник и перезапускает сервисы overnet, конфиг не трогает.
+Флаги после `bash -s --`:
+
+| Флаг | Что делает |
+|------|------------|
+| `--config-url URL` | скачать конфиг сети (relays, reserved) при первой установке |
+| `--role relay` | systemd-сервис `overnet-relay`; адрес для каталога — `--advertise IP:4040` или IP хоста |
+| `--role bootstrap` | каталог релеев на `0.0.0.0:8080` |
+| `--role gateway` | шлюз SOCKS5 на `127.0.0.1:9150` |
+| `--role site:name` (`search`, `files`, `mail`) | служебный сайт |
+| `--role service:ИМЯ:ПОРТ` | опубликовать `http://127.0.0.1:ПОРТ` как сайт .ov; ключ создаётся в `/var/lib/overnet/ИМЯ.key`, адрес печатается |
+| `-v v0.2.0` | конкретный релиз вместо последнего |
+| `--uninstall` | остановить сервисы и удалить бинарник (конфиг и данные остаются) |
+
+Windows (PowerShell, без прав администратора):
+
+```powershell
+irm https://raw.githubusercontent.com/ospab/overnet/master/scripts/install.ps1 | iex
+```
+
+Бинарник — `%LOCALAPPDATA%\Programs\overnet` (добавляется в PATH пользователя),
+конфиг — `%LOCALAPPDATA%\overnet\config.json`. С параметрами:
+`& ([scriptblock]::Create((irm …/install.ps1))) -ConfigUrl https://…/config.json`.
+
+Без `--config` overnet ищет конфиг так: `$OVERNET_CONFIG`, `./config.json`,
+`config.json` в каталоге данных, `/etc/overnet/config.json`.
+
 ## Роли и команды
 
 | Кто | Команда | Что делает |
@@ -52,7 +90,8 @@
     "name.ov":   "<адрес>.ov",
     "search.ov": "<адрес>.ov",
     "mail.ov":   "<адрес>.ov",
-    "files.ov":  "<адрес>.ov"
+    "files.ov":  "<адрес>.ov",
+    "source.ov": "<адрес>.ov"
   },
   "gateway": { "listen": "127.0.0.1:9150", "clearnet": "direct" },
   "relay":   { "listen": "0.0.0.0:4040", "bootstrap": "1.2.3.4:8080", "exit": "off" },
@@ -115,6 +154,36 @@ https (режим HTTPS-first).
 `http://mail.ov` безопасным контекстом. В сборках Firefox для Android с
 `about:config` (например IronFox) это лечится той же настройкой
 `dom.securecontext.allowlist`.
+
+## source.ov: исходный код в самой сети
+
+`source.ov` — зарезервированное имя для Gitea с кодом overnet: исходник
+доступен, даже когда GitHub недоступен. Gitea работает как обычно, на
+loopback, а в сеть его выводит `overnet service`:
+
+```ini
+; app.ini Gitea
+[server]
+DOMAIN       = source.ov
+ROOT_URL     = http://source.ov/
+HTTP_ADDR    = 127.0.0.1
+HTTP_PORT    = 3000
+DISABLE_SSH  = true      ; в сеть выходит только порт 80
+
+[service]
+OFFLINE_MODE = true      ; без аватаров и CDN из обычного интернета
+```
+
+```bash
+curl -fsSL …/install.sh | sudo bash -s -- --role service:source:3000
+```
+
+Установщик создаст ключ `/var/lib/overnet/source.key` и напечатает адрес — его
+вписывают клиентам в `reserved` как `"source.ov"`. Ключ — это и есть адрес:
+сохраните копию.
+
+Клонировать через шлюз: `git -c http.proxy=socks5h://127.0.0.1:9150 clone
+http://source.ov/ospab/overnet.git` (`socks5h` — чтобы имя резолвил шлюз).
 
 ## Вместе с ostp
 

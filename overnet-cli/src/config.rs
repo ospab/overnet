@@ -85,6 +85,19 @@ impl Config {
     }
 }
 
+/// Конфиг без `--config`: `$OVERNET_CONFIG`, `./config.json`, `config.json` в
+/// каталоге данных, `/etc/overnet/config.json` (так раскладывает установщик).
+pub fn default_path() -> PathBuf {
+    if let Some(p) = std::env::var_os("OVERNET_CONFIG") {
+        return PathBuf::from(p);
+    }
+    let mut candidates = vec![PathBuf::from("config.json"), data_dir().join("config.json")];
+    if cfg!(unix) {
+        candidates.push(PathBuf::from("/etc/overnet/config.json"));
+    }
+    candidates.into_iter().find(|p| p.is_file()).unwrap_or_else(|| PathBuf::from("config.json"))
+}
+
 /// Каталог данных overnet (ключи по умолчанию, профиль браузера, данные сайтов).
 pub fn data_dir() -> PathBuf {
     if let Some(home) = std::env::var_os("OVERNET_HOME") {

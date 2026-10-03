@@ -28,7 +28,7 @@ pub async fn serve_echo(listener: TcpListenerLink, key: TransportKey) -> Result<
                         }
                     }
                 }
-                Err(e) => eprintln!("рукопожатие не удалось: {e}"),
+                Err(e) => eprintln!("handshake failed: {e}"),
             }
         });
     }

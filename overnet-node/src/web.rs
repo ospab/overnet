@@ -427,7 +427,7 @@ pub async fn run_site(listener: TcpListenerLink, key: OnionKey, dir: String) -> 
             Ok(content) => HttpResponse { status: 200, body: content },
             Err(_) => HttpResponse {
                 status: 404,
-                body: format!("<h1>404</h1><p>{} не найден на этом .ov-сайте.</p>", req.path),
+                body: format!("<h1>404</h1><p>{} was not found on this .ov site.</p>", req.path),
             },
         }
     })
@@ -541,8 +541,8 @@ pub fn render_catalog(dir: &crate::bootstrap::Directory, q: &str) -> String {
         ));
     }
     let body = if items.is_empty() {
-        "<div class=\"empty\"><p>Пока здесь только каталог — сеть новая.</p>\
-         <p>Добавь сервис, и он появится тут:</p>\
+        "<div class=\"empty\"><p>Only the directory is here for now — the network is new.</p>\
+         <p>Add a service and it will show up here:</p>\
          <pre>overnet service 0.0.0.0:4040 &lt;bootstrap&gt; news.ov</pre></div>"
             .to_string()
     } else {
@@ -560,7 +560,7 @@ pub fn render_catalog(dir: &crate::bootstrap::Directory, q: &str) -> String {
          .empty{{background:#1b1b24;border:1px solid #2c2c38;border-radius:12px;padding:24px;color:#bbb}}\
          pre{{background:#0d0d12;padding:12px;border-radius:8px;color:#9d4edd;overflow-x:auto}}\
          </style></head><body><div class=\"wrap\">\
-         <h1>over<span>net</span></h1><p class=\"tag\">Каталог сети · search.ov</p>{body}\
+         <h1>over<span>net</span></h1><p class=\"tag\">Network directory · search.ov</p>{body}\
          </div></body></html>"
     )
 }

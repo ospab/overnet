@@ -25,7 +25,7 @@ async fn connect_bootstrap(
 ) -> Result<Directory, String> {
     let dir = overnet_node::bootstrap::fetch_directory_with_token(&addr, token.clone())
         .await
-        .map_err(|e| format!("Не удалось получить каталог: {e}"))?;
+        .map_err(|e| format!("Could not fetch the directory: {e}"))?;
     *state.directory.lock().await = Some(dir.clone());
     // Зарегистрировать наш P2P-файлоузел: релеи к нему подключатся, и другие смогут
     // тянуть наши файлы по overnet://<my_files_address>/<file>.
@@ -64,7 +64,7 @@ async fn navigate(url: String, state: State<'_, Arc<AppState>>) -> Result<String
         .lock()
         .await
         .clone()
-        .ok_or_else(|| "Сначала подключись к Bootstrap-ноде".to_string())?;
+        .ok_or_else(|| "Connect to a bootstrap node first".to_string())?;
 
     let token = state
         .bootstrap_token

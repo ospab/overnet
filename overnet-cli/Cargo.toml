@@ -11,7 +11,7 @@ path = "src/main.rs"
 [dependencies]
 hex = "0.4.3"
 overnet-core = { path = "../overnet-core" }
-overnet-link-tcp = { version = "0.0.1", path = "../overnet-link-tcp" }
+overnet-link-tcp = { path = "../overnet-link-tcp" }
 overnet-node = { path = "../overnet-node" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"

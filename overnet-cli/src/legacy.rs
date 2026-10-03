@@ -187,7 +187,7 @@ pub async fn run(args: Vec<String>) {
                     Ok(reply) => {
                         ok += 1;
                         println!(
-                            "[OK]   {addr}  эхо={:?}  {} мс",
+                            "[OK]   {addr}  echo={:?}  {} ms",
                             String::from_utf8_lossy(&reply),
                             t.elapsed().as_millis()
                         );
@@ -229,12 +229,12 @@ pub async fn run(args: Vec<String>) {
             let bob = OnionKey::generate();
             println!("Bob pubkey: {}", hex(&bob.public()));
             match overnet_node::messenger::send_message(&mailbox, bob.public(), b"privet bob!").await {
-                Ok(_) => println!("Alice -> отправила сообщение Bob'у"),
+                Ok(_) => println!("Alice -> sent a message to Bob"),
                 Err(e) => { eprintln!("send error: {e}"); std::process::exit(1); }
             }
             match overnet_node::messenger::fetch_inbox(&mailbox, &bob).await {
                 Ok(msgs) => {
-                    println!("Bob забрал {} сообщений:", msgs.len());
+                    println!("Bob fetched {} messages:", msgs.len());
                     for m in msgs { println!("  > {}", String::from_utf8_lossy(&m)); }
                 }
                 Err(e) => eprintln!("fetch error: {e}"),
@@ -248,7 +248,7 @@ pub async fn run(args: Vec<String>) {
                 let boot = boot.clone();
                 tokio::spawn(async move {
                     if let Err(e) = BootstrapServer::new().serve(&boot).await {
-                        eprintln!("demo bootstrap FAILED: {e} — порт 8080 занят? Убей старый overnet.");
+                        eprintln!("demo bootstrap FAILED: {e} — is port 8080 busy? Stop the old overnet.");
                     }
                 });
             }
@@ -294,7 +294,7 @@ pub async fn run(args: Vec<String>) {
             println!("  bootstrap  127.0.0.1:8080");
             println!("  search.ov  (welcome + catalog)");
             println!("  relay");
-            println!("→ браузер: Bootstrap = 127.0.0.1:8080, затем overnet://search.ov/");
+            println!("→ browser: Bootstrap = 127.0.0.1:8080, then overnet://search.ov/");
             std::future::pending::<()>().await
         }
         Some("files") => {
@@ -342,19 +342,19 @@ pub async fn run(args: Vec<String>) {
                 eprintln!("create dir failed: {e}");
                 std::process::exit(1);
             }
-            let starter = "<!doctype html>\n<html lang=\"ru\"><head><meta charset=\"utf-8\">\
-<title>Мой .ov сайт</title>\n<style>body{font-family:system-ui;max-width:680px;margin:60px auto;\
+            let starter = "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">\
+<title>My .ov site</title>\n<style>body{font-family:system-ui;max-width:680px;margin:60px auto;\
 padding:0 20px;background:#0d0d12;color:#eee}h1 span{color:#9d4edd}code,pre{color:#9d4edd}</style>\
-</head>\n<body><h1>Привет из <span>overnet</span>!</h1>\
-<p>Это твой сайт. Отредактируй <code>index.html</code> и опубликуй:</p>\n\
-<pre>overnet host ./ПАПКА 127.0.0.1:8080 мойсайт.ov</pre></body></html>\n";
+</head>\n<body><h1>Hello from <span>overnet</span>!</h1>\
+<p>This is your site. Edit <code>index.html</code> and publish it:</p>\n\
+<pre>overnet host ./FOLDER 127.0.0.1:8080 mysite.ov</pre></body></html>\n";
             let path = std::path::Path::new(&dir).join("index.html");
             if let Err(e) = std::fs::write(&path, starter) {
                 eprintln!("write failed: {e}");
                 std::process::exit(1);
             }
-            println!("создан стартовый сайт: {}", path.display());
-            println!("опубликуй: overnet host {dir} 127.0.0.1:8080 мойсайт.ov");
+            println!("starter site created: {}", path.display());
+            println!("publish it: overnet host {dir} 127.0.0.1:8080 mysite.ov");
         }
         Some("dir") => {
             // Диагностика: дёрнуть каталог у bootstrap и показать узлы.

@@ -158,11 +158,11 @@ async fn error_page(mut tcp: TcpStream, host: &str, why: &str) -> Result<()> {
     let mut req = [0u8; 4096];
     let _ = tokio::time::timeout(std::time::Duration::from_secs(2), tcp.read(&mut req)).await;
     let body = format!(
-        "<!doctype html><html lang=\"ru\"><head><meta charset=\"utf-8\"><title>{h} недоступен</title>\
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>{h} is unavailable</title>\
 <style>body{{background:#0b0b10;color:#ececf1;font-family:system-ui,sans-serif;max-width:640px;margin:12vh auto;padding:0 24px}}\
 h1{{font-size:26px}}h1 span{{color:#9d6bff}}code{{color:#b88bff;word-break:break-all}}p{{color:#8a8a99}}</style></head>\
-<body><h1><span>overnet</span>: {h} недоступен</h1><p>Причина:</p><code>{w}</code>\
-<p>Сервис может быть выключен, или сеть ещё не загрузила каталог. Попробуйте через минуту.</p></body></html>",
+<body><h1><span>overnet</span>: {h} is unavailable</h1><p>Reason:</p><code>{w}</code>\
+<p>The service may be offline, or the network has not loaded the directory yet. Try again in a minute.</p></body></html>",
         h = escape(host),
         w = escape(why)
     );

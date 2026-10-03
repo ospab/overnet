@@ -96,7 +96,7 @@ fn seal(hop_pub: &[u8; 32], plaintext: &[u8]) -> Result<Vec<u8>> {
 /// Снять один слой своим приватным ключом.
 fn open(secret: &StaticSecret, packet: &[u8]) -> Result<Vec<u8>> {
     if packet.len() < 32 {
-        return Err(Error::Link("onion: пакет короче 32 байт".into()));
+        return Err(Error::Link("onion: packet shorter than 32 bytes".into()));
     }
     let mut eph_pub = [0u8; 32];
     eph_pub.copy_from_slice(&packet[..32]);
@@ -111,7 +111,7 @@ fn open(secret: &StaticSecret, packet: &[u8]) -> Result<Vec<u8>> {
 /// `[hop1, hop2, ..., адресат]`. Возвращает пакет для ПЕРВОГО хопа.
 pub fn wrap(path: &[[u8; 32]], payload: &[u8]) -> Result<Vec<u8>> {
     if path.is_empty() {
-        return Err(Error::Link("onion: пустой путь".into()));
+        return Err(Error::Link("onion: empty path".into()));
     }
     let last = path.len() - 1;
 
@@ -148,13 +148,13 @@ pub fn peel(key: &OnionKey, packet: &[u8]) -> Result<Peeled> {
         Some(&TAG_DELIVER) => Ok(Peeled::Deliver(plain[1..].to_vec())),
         Some(&TAG_FORWARD) => {
             if plain.len() < 1 + 32 {
-                return Err(Error::Link("onion: короткий forward-слой".into()));
+                return Err(Error::Link("onion: short forward layer".into()));
             }
             let mut next = [0u8; 32];
             next.copy_from_slice(&plain[1..33]);
             Ok(Peeled::Forward { next, inner: plain[33..].to_vec() })
         }
-        _ => Err(Error::Link("onion: неизвестный тег слоя".into())),
+        _ => Err(Error::Link("onion: unknown layer tag".into())),
     }
 }
 
@@ -177,20 +177,20 @@ mod tests {
         // Релей снимает свой слой: видит только next-hop + непрозрачный блоб.
         let inner = match peel(&relay, &packet).unwrap() {
             Peeled::Forward { next, inner } => {
-                assert_eq!(next, dest.public(), "релей должен узнать только следующий хоп");
+                assert_eq!(next, dest.public(), "the relay must learn only the next hop");
                 inner
             }
-            Peeled::Deliver(_) => panic!("релей не должен доставлять"),
+            Peeled::Deliver(_) => panic!("the relay must not deliver"),
         };
 
         // Payload недоступен ни в исходном пакете, ни в том, что видит релей.
-        assert!(!contains(&packet, secret), "payload не должен быть виден на проводе");
-        assert!(!contains(&inner, secret), "релей не должен видеть payload");
+        assert!(!contains(&packet, secret), "the payload must not be visible on the wire");
+        assert!(!contains(&inner, secret), "the relay must not see the payload");
 
         // Адресат снимает последний слой и читает payload.
         match peel(&dest, &inner).unwrap() {
             Peeled::Deliver(p) => assert_eq!(p, secret),
-            Peeled::Forward { .. } => panic!("адресат должен доставлять, не пересылать"),
+            Peeled::Forward { .. } => panic!("the destination must deliver, not forward"),
         }
     }
 
@@ -201,7 +201,7 @@ mod tests {
         let attacker = OnionKey::generate();
 
         let packet = wrap(&[relay.public(), dest.public()], b"x").unwrap();
-        assert!(peel(&attacker, &packet).is_err(), "чужой ключ не должен снимать слой");
+        assert!(peel(&attacker, &packet).is_err(), "a foreign key must not peel the layer");
     }
 
     #[test]
@@ -210,7 +210,7 @@ mod tests {
         let packet = wrap(&[dest.public()], b"direct").unwrap();
         match peel(&dest, &packet).unwrap() {
             Peeled::Deliver(p) => assert_eq!(p, b"direct"),
-            Peeled::Forward { .. } => panic!("один хоп = сразу доставка"),
+            Peeled::Forward { .. } => panic!("a single hop means immediate delivery"),
         }
     }
 }

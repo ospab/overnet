@@ -1,94 +1,105 @@
-# Философия overnet
+# overnet philosophy
 
-*Версия 0.1 — 2026-06-23. Это живой документ и рабочая тетрадь, а не манифест в камне.*
+*Version 0.1 — 2026-06-23. A living document and a working notebook, not a manifesto set in stone.*
 
 ---
 
-## 1. Зачем
+## 1. Why
 
-Вектор государств — закрытый интернет: whitelist-режим (пропускается только
-явно разрешённое), изоляция трансграничных стыков, активное зондирование всего
-непонятного. Инструменты вроде VPN и проксей живут в режиме вечной гонки и
-структурно проигрывают: финал цензуры выключает не конкретный протокол, а
-**сам канал** под ним.
+States are moving toward a closed internet: whitelist mode (only what is
+explicitly allowed gets through), isolated cross-border links, active probing of
+anything unrecognized. Tools like VPNs and proxies live in a permanent arms race
+and structurally lose: the endgame of censorship switches off not a particular
+protocol but **the channel itself** underneath it.
 
-overnet исходит из худшего сценария как из данности: **граница закрыта,
-магистрали под контролем, любой неопознанный трафик дропается.** Если сеть
-проектировать под этот мир, она переживёт и менее жёсткие.
+overnet takes the worst case as a given: **the border is closed, the backbones
+are controlled, any unidentified traffic is dropped.** A network designed for
+that world will survive milder ones too.
 
-Свобода обмена информацией здесь — не фича, а причина существования.
+Freedom to exchange information is not a feature here; it is the reason the
+project exists.
 
-## 2. Главный инженерный принцип
+## 2. The main engineering principle
 
-> Сеть должна переживать враждебность собственной инфраструктуры.
+> The network must survive the hostility of its own infrastructure.
 
-Мы не предполагаем, что узлы, провайдеры и носители честны. Мы предполагаем, что
-часть из них принадлежит противнику. Из этого следует всё остальное: шифрование
-по умолчанию, отсутствие центральных точек, маршрутизация, при которой ни один
-узел не видит всю картину.
+We do not assume that nodes, providers or media are honest. We assume some of
+them belong to the adversary. Everything else follows from that: encryption by
+default, no central points, routing in which no single node sees the whole
+picture.
 
-## 3. Принципы
+## 3. Principles
 
-1. **Метаданные — это враг, не только содержимое.**
-   Кто с кем говорит, когда и сколько — часто опаснее самого сообщения. Защита
-   метаданных (а не только payload) — первоклассная задача, а не довесок.
+1. **Metadata is the enemy, not just content.**
+   Who talks to whom, when and how much is often more dangerous than the message
+   itself. Protecting metadata (not only the payload) is a first-class task, not
+   an add-on.
 
-2. **Транспорт — сменная деталь.**
-   Логическая сеть не привязана к носителю. Интернет-туннель, радио, оптика,
-   sneakernet — всё это лишь рёбра графа. См. [architecture.md](architecture.md).
+2. **Transport is a replaceable part.**
+   The logical network is not tied to a medium. An internet tunnel, radio,
+   optics, sneakernet — all of them are just edges of the graph. See
+   [architecture.md](architecture.md).
 
-3. **Адрес принадлежит ключу, а не реестру.**
-   Адрес узла выводится из его публичного ключа. Нет центрального органа,
-   который выдаёт или отзывает адреса.
+3. **An address belongs to a key, not to a registry.**
+   A node's address is derived from its public key. There is no central body
+   that issues or revokes addresses.
 
-4. **Участник = нода.**
-   Если ты пользуешься overnet, ты ретранслируешь overnet. Это не только
-   идеология, но и решение проблемы релеинга: трафик несут все, а не выделенные
-   жертвенные узлы. Это же снижает выделяемость отдельного участника в массе.
+4. **Participant = node.**
+   If you use overnet, you relay overnet. This is not only ideology but a
+   solution to the relaying problem: everyone carries traffic, not a few
+   dedicated sacrificial nodes. It also makes a single participant harder to
+   single out in the crowd.
 
-5. **Физический суверенитет — единственная полная неблокируемость.**
-   DPI нельзя обмануть на носителе, которым ты владеешь. Поэтому фаза 3
-   (свой носитель) — не романтика, а логический предел проекта. Цена —
-   физическая обнаружимость (радио пеленгуется); это закладывается в дизайн
-   честно. См. [threat-model.md](threat-model.md).
+5. **Physical sovereignty is the only complete unblockability.**
+   DPI cannot be fooled on a medium you own. That is why phase 3 (our own
+   medium) is not romance but the logical limit of the project. The price is
+   physical detectability (radio can be direction-found); the design accounts
+   for that honestly. See [threat-model.md](threat-model.md).
 
-6. **Граница честности: что шифруем vs что маскируем.**
-   В своей сети (фаза 2–3) мы шифруем пакет целиком, включая служебную часть.
-   Поверх чужого интернета (фаза 1) внешний конверт зашифровать **нельзя** — его
-   читают чужие роутеры; там мы не шифруем конверт, а **маскируем** его под
-   разрешённый трафик. Путать эти две вещи — главная ошибка новичка.
+6. **The honesty boundary: what we encrypt vs what we disguise.**
+   In our own network (phases 2–3) we encrypt the whole packet, including the
+   control part. Over someone else's internet (phase 1) the outer envelope
+   **cannot** be encrypted — other people's routers read it; there we do not
+   encrypt the envelope, we **disguise** it as permitted traffic. Confusing the
+   two is the classic beginner's mistake.
 
-## 4. Инженерная этика криптографии
+## 4. Cryptographic engineering ethics
 
-**Мы не катаем свою крипту.** Это правило №1 для всех, кроме горстки людей
-планеты, и нарушают его обычно как раз те, кто думает, что он исключение.
+**We do not roll our own crypto.** This is rule #1 for everyone except a handful
+of people on the planet, and it is usually broken by exactly those who think
+they are the exception.
 
-- Примитивы берём проверенные: **X25519** (обмен ключами), **ChaCha20-Poly1305**
-  (AEAD-шифрование с проверкой целостности), **Noise Protocol Framework** для
-  хендшейков (на нём построен WireGuard).
-- **Новизна overnet — в конструкции, не в примитиве.** WireGuard прославил
-  Jason Donenfeld, который не изобрёл ни одного шифра — он собрал существующие
-  так просто и красиво, что мир пересел. Signal, Tor, Sphinx — то же самое:
-  уважают за *протокол/систему*, не за самодельный алгоритм.
-- **То, что не пережило публичную атаку, не имеет ценности.** AES — открытый
-  конкурс. Постквантовые Kyber/Dilithium — многолетний турнир NIST. Авторитет
-  djb (Curve25519/ChaCha) — в том, что его вещи не сломали за 15 лет, а не в
-  том, что они новые. Наша конструкция должна быть спроектирована так, чтобы её
-  *можно было* однажды вынести на публичный обстрел.
+- We use proven primitives: **X25519** (key exchange), **ChaCha20-Poly1305**
+  (authenticated encryption), the **Noise Protocol Framework** for handshakes
+  (WireGuard is built on it), **ntor** for circuit handshakes (as in Tor).
+- **overnet's novelty is in the construction, not the primitive.** Jason
+  Donenfeld became known for WireGuard without inventing a single cipher — he
+  put existing ones together so simply and cleanly that the world switched.
+  Signal, Tor, Sphinx — same story: respected for the *protocol and system*, not
+  for a home-made algorithm.
+- **Anything that has not survived public attack has no value.** AES came from
+  an open competition. Post-quantum Kyber/Dilithium came from a multi-year NIST
+  tournament. djb's authority (Curve25519/ChaCha) comes from his work not being
+  broken for 15 years, not from it being new. Our construction must be designed
+  so that it *can* one day be put up for public scrutiny.
 
-## 5. Какой славы мы хотим (и почему это важно для дизайна)
+## 5. What kind of recognition we want (and why it matters for design)
 
-Модель — Bellard (FFmpeg) и Bernstein (djb): знают те, кто понимает, что ты
-сделал; не секунда в ленте. Это влияет на инженерные решения: мы строим, чтобы
-**пережить** и чтобы на это **пересели**, а не чтобы быстро впечатлить. Долговечная,
-понятная, документированная конструкция важнее эффектной демки.
+The model is Bellard (FFmpeg) and Bernstein (djb): known to those who understand
+what you built, not a second in a feed. This shapes engineering decisions: we
+build to **last** and for people to **switch over**, not to impress quickly. A
+durable, understandable, documented construction matters more than a flashy
+demo.
 
-## 6. Что мы честно НЕ обещаем
+## 6. What we honestly do NOT promise
 
-- Не обещаем стойкость против глобального пассивного наблюдателя с идеальной
-  корреляцией трафика — этого не умеет и Tor. См. [threat-model.md](threat-model.md).
-- Не обещаем защиту участника, которого вычислили физически и пришли домой.
-- Не обещаем «изобретём новый неуязвимый шифр». Мы собираем из проверенного.
+- We do not promise resistance to a global passive observer with perfect
+  traffic correlation — Tor cannot do that either. See
+  [threat-model.md](threat-model.md).
+- We do not promise to protect a participant who has been identified physically
+  and visited at home.
+- We do not promise "we will invent a new unbreakable cipher". We build from
+  proven parts.
 
-Честность модели угроз — часть философии. Сеть, которая врёт о том, от чего
-защищает, опаснее отсутствия сети.
+An honest threat model is part of the philosophy. A network that lies about what
+it protects against is more dangerous than no network at all.

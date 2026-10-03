@@ -18,8 +18,9 @@ use overnet_core::{Error, Result};
 
 use super::client::Client;
 
-/// Зарезервированные имена: регистратор, поиск, почта, файлообменник.
-pub const RESERVED: [&str; 4] = ["name.ov", "search.ov", "mail.ov", "files.ov"];
+/// Зарезервированные имена: регистратор, поиск, почта, файлообменник и
+/// исходный код самого overnet (Gitea).
+pub const RESERVED: [&str; 5] = ["name.ov", "search.ov", "mail.ov", "files.ov", "source.ov"];
 
 /// Адреса официальных сервисов. Пусто, пока они не подняты: до тех пор адреса
 /// берутся из `reserved` в конфиге.

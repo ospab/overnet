@@ -1,203 +1,218 @@
-# Архитектура overnet
+# overnet architecture
 
-*Версия 0.1 — 2026-06-23. Черновик. Многое ещё открыто — открытые вопросы помечены явно.*
+*Version 0.1 — 2026-06-23. A draft. Much is still open — open questions are marked explicitly.*
 
 ---
 
-## 0. Центральное решение
+## 0. The central decision
 
-Всё держится на одном:
+Everything rests on one thing:
 
-> **Transport-agnostic ядро + криптографическая адресация + децентрализованная
-> маршрутизация.**
+> **A transport-agnostic core + cryptographic addressing + decentralized
+> routing.**
 
-Если это сделано правильно, всё остальное (фазы, носители, приложения)
-становится сменными деталями. Если сделано неправильно — проект мёртв, как бы
-хорош ни был шифр.
+If that is done right, everything else (phases, media, applications) becomes a
+replaceable part. If it is done wrong, the project is dead no matter how good
+the cipher is.
 
-## 1. Слои
+## 1. Layers
 
-overnet сознательно **не выбрасывает** идею слоёв (OSI/пакетная коммутация —
-хорошая инженерия). Он заменяет только те точки, которые делают классический
-стек блокируемым: централизованную адресацию (RIR), централизованную
-маршрутизацию (BGP) и зависимость от лицензированного носителя.
+overnet deliberately **does not throw away** the idea of layers (OSI / packet
+switching is good engineering). It replaces only the points that make the
+classic stack blockable: centralized addressing (RIRs), centralized routing
+(BGP) and dependence on a licensed medium.
 
 ```
-┌─────────────────────────────────────────────┐
-│  Приложения (мессенджер, файлы, публикации) │
-├─────────────────────────────────────────────┤
-│  Сессии / потоки (надёжная доставка)        │
-├─────────────────────────────────────────────┤
-│  Onion-маршрутизация                        │  ← ядро
-│  Адрес = f(публичный ключ)                  │
-├─────────────────────────────────────────────┤ 
-│  Абстракция транспорта (Link = ребро графа)   │  ← ключ к выживаемости
-├──────────┬──────────┬──────────┬─────────────┤
-│ TCP/      │ WiFi     │ LoRa /   │ Bluetooth /│  ← сменные носители
-│ Reality   │ антенна  │ радио    │ sneakernet │
-└──────────┴──────────┴──────────┴─────────────┘
+┌──────────────────────────────────────────────┐
+│  Applications (messenger, files, publishing) │
+├──────────────────────────────────────────────┤
+│  Sessions / streams (reliable delivery)      │
+├──────────────────────────────────────────────┤
+│  Onion routing                               │  ← the core
+│  Address = f(public key)                     │
+├──────────────────────────────────────────────┤
+│  Transport abstraction (Link = graph edge)   │  ← the key to survivability
+├───────────┬──────────┬──────────┬────────────┤
+│ TCP /     │ Wi-Fi    │ LoRa /   │ Bluetooth /│  ← replaceable media
+│ ostp      │ antenna  │ radio    │ sneakernet │
+└───────────┴──────────┴──────────┴────────────┘
 ```
 
-### 1.1. Абстракция транспорта (Link)
+### 1.1. Transport abstraction (Link)
 
-Самая важная и самая проверяемая часть. `Link` — это двунаправленный канал
-доставки кадров между двумя соседними узлами. Ядру всё равно, что под ним:
+The most important and most testable part. A `Link` is a bidirectional
+frame-delivery channel between two neighbouring nodes. The core does not care
+what is underneath:
 
-- **TCP/Reality-туннель** — интернет-ребро (фаза 1, переиспользуем `ostp`).
-- **WiFi точка-точка** (направленная антенна) — физическое ребро (фаза 3).
-- **LoRa / пакетное радио** — дальнобойное, узкополосное ребро (текст, store-and-forward).
-- **Bluetooth / WiFi Direct** — локальные рёбра между телефонами без интернета.
-- **Sneakernet** — асинхронное ребро (флешка/QR), store-and-forward.
+- **TCP / ostp tunnel** — an internet edge (phase 1, reusing `ostp`).
+- **Point-to-point Wi-Fi** (directional antenna) — a physical edge (phase 3).
+- **LoRa / packet radio** — a long-range, narrow-band edge (text, store-and-forward).
+- **Bluetooth / Wi-Fi Direct** — local edges between phones without internet.
+- **Sneakernet** — an asynchronous edge (USB stick / QR), store-and-forward.
 
-Контракт `Link` (черновик):
+The `Link` contract (draft):
 ```
 trait Link {
-    fn send(frame: &[u8]) -> Result<()>;       // отправить кадр соседу
-    fn recv() -> Result<Vec<u8>>;               // принять кадр от соседа
-    fn mtu() -> usize;                          // макс. размер кадра
-    fn properties() -> LinkProps;               // задержка, пропускная, надёжность, направленность
+    fn send(frame: &[u8]) -> Result<()>;       // send a frame to the neighbour
+    fn recv() -> Result<Vec<u8>>;               // receive a frame from the neighbour
+    fn mtu() -> usize;                          // max frame size
+    fn properties() -> LinkProps;               // latency, bandwidth, reliability, directionality
 }
 ```
-`properties()` нужен роутингу, чтобы выбирать маршрут (по LoRa не погонишь видео).
+`properties()` is needed by routing to choose a path (you cannot push video over
+LoRa).
 
-**Открытый вопрос:** единый ли формат кадра для всех носителей, или адаптеры на
-каждый. Скорее адаптеры с общим внутренним пакетом.
+**Open question:** one frame format for all media, or adapters for each.
+Probably adapters with a common inner packet.
 
-### 1.2. Адресация
+### 1.2. Addressing
 
-Адрес узла = производная от его долговременного публичного ключа
-(например, хеш Ed25519/X25519-ключа). Свойства:
+A node's address is derived from its long-term public key (e.g. a hash of an
+Ed25519/X25519 key). Properties:
 
-- **Самовыделяемый** — узел генерирует ключ → имеет адрес. Реестр не нужен.
-- **Самоудостоверяющий** — зная адрес, ты знаешь, чей ключ за ним; нельзя
-  подменить узел, не имея его приватного ключа.
-- **Не отзываемый централизованно** — нет органа, который «забанит» адрес.
+- **Self-assigned** — a node generates a key and has an address. No registry.
+- **Self-authenticating** — knowing the address, you know whose key is behind
+  it; a node cannot be impersonated without its private key.
+- **Not centrally revocable** — there is no authority that can "ban" an address.
 
-**Открытый вопрос:** как делать человекочитаемые имена (petnames / web-of-trust
-именование), не вводя централизованный DNS.
+**Open question:** how to do human-readable names (petnames / web-of-trust
+naming) without introducing a centralized DNS. v0.2 answer: self-authenticating
+`.ov` addresses plus a registrar whose records the client verifies — see
+[naming.md](naming.md) and [running.md](running.md).
 
-### 1.3. Onion-маршрутизация (ядро приватности)
+### 1.3. Onion routing (the privacy core)
 
-Каждый хоп знает только предшественника и преемника — никогда всю картину.
-Это **луковичная маршрутизация**, и брать надо строгую, обкатанную версию
-(**Sphinx**), а не наивный «попробуй расшифровать заголовок → не вышло → флуди»
-(это даёт флудинг и не масштабируется, плюс RSA-на-хоп убивает скорость).
+Each hop knows only its predecessor and successor — never the whole picture.
+This is **onion routing**, and it has to be a strict, battle-tested version
+(**Sphinx**), not the naive "try to decrypt the header → failed → flood" (that
+leads to flooding and does not scale, and RSA per hop kills speed).
 
-Механика Sphinx (в двух словах): источник кладёт в заголовок эфемерный публичный
-ключ; нужный хоп через **один X25519-ECDH** детерминированно выводит ключ своего
-слоя, расшифровывает его, читает явное «следующий хоп = X», пилит слой и шлёт
-дальше одному адресату. Пакеты фиксированной длины (не течёт длина маршрута),
-есть защита от replay. Подробная модель пакета и крипто — в отдельном документе
-`packet-crypto.md` (следующий по плану).
+Sphinx mechanics in short: the source puts an ephemeral public key in the
+header; the right hop derives its layer key deterministically with **one X25519
+ECDH**, decrypts its layer, reads an explicit "next hop = X", strips the layer
+and sends it on to a single recipient. Fixed-length packets (route length does
+not leak), replay protection. A detailed packet and crypto model belongs in a
+separate document, `packet-crypto.md`.
 
-**Без exit-нод.** Адресат — это узел overnet, а не сайт в clearnet. Значит,
-классической проблемы exit-нод (злоупотребления, блокировки, юридические
-претензии к выходу) просто **не существует**. Это сознательный отказ от выхода в
-обычный интернет в пользу самодостаточности.
+> **v0.2 status:** circuits are built Tor-style instead — an ntor handshake per
+> hop, fixed-size 1024-byte cells, one ChaCha20 layer per hop, streams with
+> SENDME windows. Sphinx remains the target for asynchronous / store-and-forward
+> traffic. See [running.md](running.md).
 
-## 2. Топология доверия и выбор guard'ов
+**Exits are optional.** By default the destination is an overnet node, not a
+clearnet site, so the classic exit-node problems (abuse, blocking, legal claims
+against the exit) do not arise. Exits to the clearnet exist only as an opt-in
+node role, off by default and clearly marked — the self-sufficient part of the
+network does not depend on them.
 
-Открытое членство уязвимо к Sybil-атаке: государство заливает сеть тысячами
-своих узлов, чтобы деанонить и рвать маршруты. Создать личность у нас **бесплатно**
-(адрес = f(ключ)), поэтому «сотня вражеских узлов» — дефолт, а не гипотеза.
+## 2. Trust topology and guard selection
 
-**Якорь доверия бывает только трёх видов — четвёртой двери нет:**
-центральный авторитет (отвергаем — изымается/принуждается), дефицитный ресурс
-(PoW/stake) или социальный граф (F2F/web-of-trust). Поведенческие эвристики
-(«узел ведёт себя стабильно → доверяем») — **НЕ** четвёртая дверь, а геймящийся
-суррогат: терпеливое государство делает узлы стабильнее и старше живых людей,
-и эвристика начнёт выбирать **именно противника**.
+Open membership is vulnerable to a Sybil attack: the state floods the network
+with thousands of its own nodes to deanonymize users and break routes. Creating
+an identity costs us **nothing** (address = f(key)), so "a hundred hostile
+nodes" is the default, not a hypothesis.
 
-### Решение (принято 2026-06-23)
+**A trust anchor comes in only three kinds — there is no fourth door:**
+a central authority (rejected — it can be seized or coerced), a scarce resource
+(PoW / stake), or a social graph (F2F / web-of-trust). Behavioural heuristics
+("the node behaves stably, so we trust it") are **NOT** a fourth door but a
+gameable substitute: a patient state makes its nodes more stable and older than
+real people's, and the heuristic will end up choosing **exactly the adversary**.
 
-**База (для всех участников):**
-- **mixnet-вкус onion** (задержки + cover traffic + паддинг) — против корреляции
-  по таймингу (см. glossary, threat-model §4);
-- **личные и скрытые guard'ы** — каждый участник выбирает СВОИ входы и не
-  разглашает их. Общесетевой публичный список guard'ов = список мишеней (ошибка,
-  которой страдает открытый список релеев Tor → отсюда «мосты»);
-- **диверсификация пути** — не брать два хопа из одной подсети/AS/оператора;
-- **дорогие личности (PoW)** — поднять цену Sybil с «даром» до «дорого».
+### Decision (taken 2026-06-23)
 
-**Локальный мониторинг поведения = только защита, не назначение.** Клиент может
-локально и приватно **выкидывать** guard, который ведёт себя подозрительно
-(рвёт цепочки, зондирует). Он **не** имеет права присваивать кому-то
-общесетевой статус доверия и вещать его: самоаттестация бесполезна (врут именно
-злодеи), а голосование геймится Sybil.
+**Baseline (for all participants):**
+- **a mixnet flavour of onion** (delays + cover traffic + padding) against timing
+  correlation (see glossary, threat-model §4);
+- **personal, hidden guards** — each participant picks THEIR OWN entry points
+  and does not disclose them. A network-wide public guard list is a target list
+  (a mistake Tor's open relay list suffers from — hence "bridges");
+- **path diversity** — never take two hops from the same subnet / AS / operator;
+- **expensive identities (PoW)** — raise the price of Sybil from "free" to
+  "costly".
 
-**Опциональный жёсткий уровень — F2F / web-of-trust** для участников с высокой
-угрозой: прямые линки только со знакомыми. Бонусы: сопротивление инфильтрации,
-идеально ложится на физический mesh, естественно сочетается с «участник = нода».
+**Local behaviour monitoring = protection only, never assignment.** A client
+may locally and privately **drop** a guard that behaves suspiciously (breaks
+circuits, probes). It has **no** right to assign anyone a network-wide trust
+status and broadcast it: self-attestation is useless (the villains are exactly
+the ones who lie), and voting can be gamed by Sybils.
 
-Итог: анонимность **деградирует плавно** с ростом доли противника, а не
-обнуляется при первой сотне вражеских узлов. Полной стойкости против глобального
-коррелятора не обещаем (см. threat-model §4).
+**An optional hard tier — F2F / web-of-trust** for high-risk participants:
+direct links only with people you know. Benefits: resistance to infiltration,
+a perfect fit for a physical mesh, a natural match with "participant = node".
 
-**Открытый вопрос (большой):** граница между открытым ростом (база) и F2F-ядром
-(жёсткий уровень). Гибрид пока не формализован.
+Result: anonymity **degrades gracefully** as the adversary's share grows,
+instead of dropping to zero at the first hundred hostile nodes. We do not
+promise full resistance to a global correlator (see threat-model §4).
 
-## 3. Фазы развёртывания
+**Open question (a big one):** the boundary between open growth (baseline) and
+the F2F core (hard tier). The hybrid is not formalized yet.
 
-Один код, три фазы носителя:
+## 3. Deployment phases
 
-**Фаза 1 — Overlay (сегодня).**
-Поверх интернета, маскировка под разрешённый трафик. Интернет-`Link` оборачивает
-`ostp_core::protocol::ProtocolMachine` (Noise + паддинг + обфускация заголовков; Reality из ostp убран в 0.4.0) —
-переиспользуем, не переписываем (overnet зависит от `ostp-core` по path). Даёт
-пользу и пользователей уже сейчас, обкатывает ядро. Onion-слои overnet — сверху.
+One codebase, three medium phases:
 
-**Фаза 2 — P2P mesh (самодостаточный даркнет).**
-Onion-маршрутизация, F2F-топология, NAT-traversal/hole-punching для прямых p2p
-поверх интернета. Сеть становится логически самодостаточной — клиенты overnet
-говорят с клиентами overnet, не завися от выхода в clearnet.
+**Phase 1 — Overlay (today).**
+Over the internet, disguised as permitted traffic. The internet `Link` wraps
+`ostp_core::protocol::ProtocolMachine` (Noise + padding + header obfuscation;
+Reality was removed from ostp in 0.4.0) — reused, not rewritten (overnet depends
+on `ostp-core` by path). Gives value and users right now and exercises the core.
+overnet's onion layers sit on top.
 
-**Фаза 3 — Physical (эндгейм).**
-Свой носитель там, где есть плотность: направленные WiFi-антенны, LoRa, оптика.
-Тот же стек поверх физических `Link`. Единственное, что DPI не блокирует в
-принципе, ценой физической обнаружимости (см. threat-model).
+**Phase 2 — P2P mesh (a self-sufficient darknet).**
+Onion routing, F2F topology, NAT traversal / hole punching for direct p2p over
+the internet. The network becomes logically self-sufficient — overnet clients
+talk to overnet clients without depending on a way out to the clearnet.
 
-## 4. Граница «шифруем vs маскируем»
+**Phase 3 — Physical (the endgame).**
+Our own medium where density allows: directional Wi-Fi antennas, LoRa, optics.
+The same stack over physical `Link`s. The one thing DPI cannot block in
+principle, at the price of physical detectability (see threat-model).
 
-Жёсткое следствие, которое надо держать в голове постоянно:
+## 4. The "encrypt vs disguise" boundary
 
-- **В своей сети (фаза 2–3)** все форвардящие узлы — наши, поэтому пакет
-  шифруется целиком; в открытом виде только локальная адресация для соседнего
-  физического хопа (она бессмысленна для глобального наблюдателя).
-- **Поверх чужого интернета (фаза 1)** внешний IP-заголовок шифровать **нельзя** —
-  его маршрутизируют чужие роутеры. Там мы не прячем конверт, а **маскируем** его
-  под разрешённый трафик (Reality). Всё ценное — внутри.
+A hard consequence to keep in mind at all times:
 
-И отдельно: **шифрование само по себе ТСПУ не побеждает.** Высокоэнтропийный
-«мусор без TLS-хендшейка» — яркая аномалия, которую whitelist-режим дропнет по
-форме, даже не прочитав. Поэтому нужны либо мимикрия (фаза 1), либо свой носитель
-(фаза 3), плюс защита от анализа трафика (паддинг до фикс-длины, перемешивание —
-территория миксетей: Loopix/Nym).
+- **In our own network (phases 2–3)** all forwarding nodes are ours, so the
+  whole packet is encrypted; only local addressing for the neighbouring physical
+  hop stays in the clear (it is meaningless to a global observer).
+- **Over someone else's internet (phase 1)** the outer IP header **cannot** be
+  encrypted — other people's routers route it. There we do not hide the
+  envelope, we **disguise** it as permitted traffic (ostp). Everything valuable
+  is inside.
 
-## 5. Открытые проблемы (честно)
+And separately: **encryption alone does not beat DPI.** High-entropy "garbage
+without a TLS handshake" is a glaring anomaly that a whitelist regime will drop
+by its shape without reading it. So we need either mimicry (phase 1) or our own
+medium (phase 3), plus protection against traffic analysis (padding to a fixed
+length, mixing — mixnet territory: Loopix / Nym).
 
-Протокол — лёгкая часть. Убивают эти:
+## 5. Open problems (honestly)
 
-1. **Масштабируемость роутинга.** Плоский mesh не тянет миллионы узлов
-   (cjdns это показал). Нужна иерархия/DHT — не решено.
-2. **Sybil / доверие.** См. §2. F2F помогает, но ломает открытый рост.
-3. **Инцентивы / участие.** «Участник = нода» держится на идеологии. Что будет,
-   когда энтузиазм спадёт — открыто. Токены пока не рассматриваем (регуляторный
-   и моральный капкан).
-4. **Физическая обнаружимость (фаза 3).** Радио пеленгуется. Сетевая
-   неблокируемость покупается ценой физического риска оператора.
-5. **NAT-traversal (фаза 1–2).** CGNAT у провайдеров мешает прямым p2p; нужны
-   hole-punching и релеи.
+The protocol is the easy part. These are the killers:
 
-## 6. На чьих плечах стоим (изучить до написания своего)
+1. **Routing scalability.** A flat mesh cannot carry millions of nodes (cjdns
+   showed that). A hierarchy / DHT is needed — not solved.
+2. **Sybil / trust.** See §2. F2F helps but breaks open growth.
+3. **Incentives / participation.** "Participant = node" relies on ideology. What
+   happens when enthusiasm fades is open. Tokens are not considered for now (a
+   regulatory and moral trap).
+4. **Physical detectability (phase 3).** Radio can be direction-found. Network
+   unblockability is bought with the operator's physical risk.
+5. **NAT traversal (phases 1–2).** Carrier-grade NAT gets in the way of direct
+   p2p; hole punching and relays are needed.
 
-- **Reticulum (RNS)** — transport-agnostic криптостек поверх любого носителя;
-  ближе всего к нашему видению, изучить первым.
-- **Yggdrasil** — криптоадреса из ключа + self-routing.
-- **Sphinx** (Danezis & Goldberg) — формат onion-пакета.
-- **Tor ntor**, **Noise Framework**, **WireGuard** — как делать хендшейки и не
-  катать крипту руками.
-- **Briar** — F2F + мульти-транспорт (Tor/Bluetooth/WiFi Direct), офлайн.
-- **Loopix / Nym** — защита метаданных от анализа трафика.
+## 6. Whose shoulders we stand on (study before writing our own)
 
-Возможно, наш вклад — не новый стек, а слой приватности/инцентивов/UX поверх
-готового. Это решаем после того, как проживём неделю с Reticulum и Yggdrasil.
+- **Reticulum (RNS)** — a transport-agnostic crypto stack over any medium;
+  closest to our vision, study first.
+- **Yggdrasil** — crypto addresses from keys + self-routing.
+- **Sphinx** (Danezis & Goldberg) — the onion packet format.
+- **Tor ntor**, **Noise Framework**, **WireGuard** — how to do handshakes without
+  hand-rolling crypto.
+- **Briar** — F2F + multi-transport (Tor / Bluetooth / Wi-Fi Direct), offline.
+- **Loopix / Nym** — protecting metadata from traffic analysis.
+
+Perhaps our contribution is not a new stack but a privacy / incentives / UX
+layer on top of an existing one. We decide that after living with Reticulum and
+Yggdrasil for a week.

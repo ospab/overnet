@@ -1,0 +1,87 @@
+# Релиз по тегу v*: бинарник overnet под каждую платформу, архивы с
+# config.example.json и .sha256 рядом. Их и скачивают scripts/install.sh и
+# scripts/install.ps1.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-22.04, target: x86_64-unknown-linux-gnu, name: overnet-linux-amd64.tar.gz }
+          - { os: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu, name: overnet-linux-arm64.tar.gz }
+          - { os: macos-14, target: aarch64-apple-darwin, name: overnet-macos-arm64.tar.gz }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, name: overnet-windows-amd64.zip }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: overnet
+    steps:
+      # overnet-link-ostp берёт ostp-core по пути ../../ostp: без него cargo не
+      # загрузит workspace, хотя в бинарник overnet он не входит.
+      - uses: actions/checkout@v4
+        with:
+          path: overnet
+      - uses: actions/checkout@v4
+        with:
+          repository: ospab/ostp
+          path: ostp
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+          workspaces: overnet
+
+      - name: Test
+        run: cargo test -p overnet-sites -p overnet-cli --target ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release -p overnet-cli --target ${{ matrix.target }}
+
+      - name: Package (unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          mkdir dist
+          cp target/${{ matrix.target }}/release/overnet config.example.json LICENSE dist/
+          tar -czf ${{ matrix.name }} -C dist .
+          shasum -a 256 ${{ matrix.name }} > ${{ matrix.name }}.sha256
+
+      - name: Package (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item target/${{ matrix.target }}/release/overnet.exe, config.example.json, LICENSE dist/
+          Compress-Archive -Path dist/* -DestinationPath ${{ matrix.name }}
+          "$((Get-FileHash ${{ matrix.name }} -Algorithm SHA256).Hash.ToLower())  ${{ matrix.name }}" | Out-File -Encoding ascii -NoNewline ${{ matrix.name }}.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: overnet/${{ matrix.name }}*
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          generate_release_notes: true

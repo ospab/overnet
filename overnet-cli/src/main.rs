@@ -23,33 +23,34 @@ use overnet_node::net::Node;
 
 use config::{data_dir, Config};
 
-const HELP: &str = "overnet — сеть, которая переживает враждебность собственной инфраструктуры
+const HELP: &str = "overnet — a network that survives the hostility of its own infrastructure
 
-Сеть:
-  overnet bootstrap [адрес]             каталог релеев (по умолчанию 0.0.0.0:8080)
+Network:
+  overnet bootstrap [address]           relay directory (default 0.0.0.0:8080)
   overnet relay [--listen A] [--advertise A] [--bootstrap A] [--exit off|direct|socks5://h:p] [--key F]
-                                        релей; печатает строку для \"relays\" в конфиге клиентов
+                                        relay; prints the line for \"relays\" in client configs
 
-Сервисы .ov:
-  overnet keygen <файл>                 новый ключ сервиса, печатает его адрес .ov
-  overnet address <файл>                адрес .ov ключа
+.ov services:
+  overnet keygen <file>                 new service key, prints its .ov address
+  overnet address <file>                .ov address of a key
   overnet service --key F --port 80=127.0.0.1:8080 [--port …]
-                                        опубликовать локальный сервер как сайт .ov
-  overnet name-sign <имя.ov> --key F    запись для регистрации имени на name.ov
+                                        publish a local server as an .ov site
+  overnet name-sign <name.ov> --key F   record for registering a name at name.ov
   overnet site name|search|files|mail [--key F] [--data DIR]
-                                        служебный сайт сети вместе с публикацией
+                                        a network service site, published
 
-Клиент:
+Client:
   overnet gateway [--listen A] [--clearnet direct|exit|block]
-                                        локальный SOCKS5-шлюз (127.0.0.1:9150)
+                                        local SOCKS5 gateway (127.0.0.1:9150)
   overnet browser [--gateway auto|always|never]
-                                        Mullvad Browser с профилем overnet
-  overnet resolve <имя.ov>              во что резолвится имя
+                                        Mullvad Browser with the overnet profile
+  overnet resolve <name.ov>             what a name resolves to
 
-  overnet demo                          вся сеть на этой машине: релеи, сайты, шлюз
-  overnet legacy …                      старые команды (до цепей v0.2)
+  overnet demo                          the whole network on this machine: relays, sites, gateway
+  overnet legacy …                      old commands (before v0.2 circuits)
 
-Общий флаг: --config <файл> (по умолчанию config.json).";
+Common flag: --config <file>. Without it: $OVERNET_CONFIG, then ./config.json,
+then config.json in the data directory, then /etc/overnet/config.json.";
 
 /// Флаги вида `--имя значение`; повторяемые копятся.
 struct Args {
@@ -84,7 +85,7 @@ impl Args {
 }
 
 fn die(msg: impl std::fmt::Display) -> ! {
-    eprintln!("ошибка: {msg}");
+    eprintln!("error: {msg}");
     std::process::exit(1)
 }
 
@@ -98,7 +99,7 @@ async fn main() {
         return legacy::run(rest).await;
     }
     let a = Args::parse(raw.get(2..).unwrap_or(&[]));
-    let cfg_path = PathBuf::from(a.flag("config").unwrap_or("config.json"));
+    let cfg_path = a.flag("config").map(PathBuf::from).unwrap_or_else(config::default_path);
     let cfg = Config::load(&cfg_path).unwrap_or_else(|e| die(e));
 
     match cmd.as_str() {
@@ -110,21 +111,21 @@ async fn main() {
         }
         "relay" => relay(&a, &cfg).await,
         "keygen" => {
-            let path = a.pos.first().unwrap_or_else(|| die("укажите файл ключа"));
+            let path = a.pos.first().unwrap_or_else(|| die("specify the key file"));
             if Path::new(path).exists() {
-                die(format!("{path} уже есть — не перезаписываю"));
+                die(format!("{path} already exists — not overwriting it"));
             }
             let key = ServiceKey::generate();
             save_key(Path::new(path), &key);
             println!("{}", key.id().to_address());
         }
         "address" => {
-            let path = a.pos.first().unwrap_or_else(|| die("укажите файл ключа"));
+            let path = a.pos.first().unwrap_or_else(|| die("specify the key file"));
             println!("{}", load_service_key(Path::new(path), false).id().to_address());
         }
         "name-sign" => {
-            let name = a.pos.first().unwrap_or_else(|| die("укажите имя, например shop.ov")).to_ascii_lowercase();
-            let key = load_service_key(Path::new(a.flag("key").unwrap_or_else(|| die("нужен --key"))), false);
+            let name = a.pos.first().unwrap_or_else(|| die("specify a name, e.g. shop.ov")).to_ascii_lowercase();
+            let key = load_service_key(Path::new(a.flag("key").unwrap_or_else(|| die("--key is required"))), false);
             let rec = NameRecord {
                 address: key.id().to_address(),
                 sig: hex::encode(key.sign(&name_message(&name))),
@@ -133,14 +134,14 @@ async fn main() {
             println!("{}", serde_json::to_string(&rec).unwrap());
         }
         "service" => {
-            let key = load_service_key(Path::new(a.flag("key").unwrap_or_else(|| die("нужен --key"))), false);
+            let key = load_service_key(Path::new(a.flag("key").unwrap_or_else(|| die("--key is required"))), false);
             let mut ports = HashMap::new();
             for p in a.all("port") {
-                let (v, local) = p.split_once('=').unwrap_or_else(|| die(format!("--port {p}: нужно ПОРТ=host:port")));
+                let (v, local) = p.split_once('=').unwrap_or_else(|| die(format!("--port {p}: expected PORT=host:port")));
                 ports.insert(v.parse::<u16>().unwrap_or_else(|_| die(format!("--port {p}"))), local.to_string());
             }
             if ports.is_empty() {
-                die("нужен хотя бы один --port 80=127.0.0.1:8080");
+                die("at least one --port 80=127.0.0.1:8080 is required");
             }
             publish(&cfg, key, ports, None).await;
         }
@@ -153,7 +154,7 @@ async fn main() {
         }
         "browser" => run_browser(&a, &cfg).await,
         "resolve" => {
-            let name = a.pos.first().unwrap_or_else(|| die("укажите имя"));
+            let name = a.pos.first().unwrap_or_else(|| die("specify a name"));
             let c = client(&cfg);
             let names = Names::new(c, &cfg.reserved).unwrap_or_else(|e| die(e));
             match names.resolve(name).await {
@@ -178,13 +179,16 @@ fn save_key(path: &Path, key: &ServiceKey) {
 fn load_service_key(path: &Path, create: bool) -> ServiceKey {
     match std::fs::read(path) {
         Ok(b) if b.len() == 32 => ServiceKey::from_bytes(b.try_into().unwrap()),
-        Ok(_) => die(format!("{}: не ключ сервиса", path.display())),
+        Ok(_) => die(format!("{}: not a service key", path.display())),
         Err(_) if create => {
             let k = ServiceKey::generate();
             save_key(path, &k);
             k
         }
-        Err(e) => die(format!("{}: {e}", path.display())),
+        Err(_) => die(format!(
+            "{p}: no such key file. Create one with: overnet keygen {p}",
+            p = path.display()
+        )),
     }
 }
 
@@ -209,8 +213,8 @@ async fn relay(a: &Args, cfg: &Config) {
     let node = Node::new(key, exit.clone());
     let listener = TcpListenerLink::bind(&listen).await.unwrap_or_else(|e| die(e));
     let pubkey = hex::encode(node.pubkey());
-    println!("overnet relay на {listen}, выход: {exit:?}");
-    println!("строка для \"relays\" в конфиге клиентов:\n  {pubkey}@{advertise}");
+    println!("overnet relay on {listen}, exit: {exit:?}");
+    println!("line for \"relays\" in client configs:\n  {pubkey}@{advertise}");
     let info = NodeInfo {
         pubkey,
         address: advertise,
@@ -230,22 +234,22 @@ async fn publish(cfg: &Config, key: ServiceKey, ports: HashMap<u16, String>, lab
     let addr = key.id().to_address();
     match label {
         Some(l) => println!("{l} → {addr}"),
-        None => println!("сервис: {addr}"),
+        None => println!("service: {addr}"),
     }
     for (p, local) in &ports {
-        println!("  порт {p} → {local}");
+        println!("  port {p} → {local}");
     }
     if let Err(e) = c.refresh_directory().await {
-        eprintln!("каталог пока недоступен ({e}); повторю позже");
+        eprintln!("directory not available yet ({e}); will retry later");
     }
     c.spawn_directory_refresh(Duration::from_secs(600));
     let _ = Service::new(c, key, ports).run().await;
 }
 
 async fn site(a: &Args, cfg: &Config) {
-    let kind = a.pos.first().map(String::as_str).unwrap_or_else(|| die("какой сайт: name, search, files или mail"));
+    let kind = a.pos.first().map(String::as_str).unwrap_or_else(|| die("which site: name, search, files or mail"));
     if !["name", "search", "files", "mail"].contains(&kind) {
-        die(format!("нет такого сайта: {kind}"));
+        die(format!("no such site: {kind}"));
     }
     let data = a.flag("data").map(PathBuf::from).unwrap_or_else(|| data_dir().join("sites").join(kind));
     std::fs::create_dir_all(&data).unwrap_or_else(|e| die(e));
@@ -288,20 +292,20 @@ async fn gateway(cfg: &Config, clearnet: Clearnet) -> Arc<Gateway> {
     let c = client(cfg);
     let names = Names::new(c.clone(), &cfg.reserved).unwrap_or_else(|e| die(e));
     match c.refresh_directory().await {
-        Ok(n) => println!("каталог: {n} релеев"),
-        Err(e) => eprintln!("каталог пока недоступен ({e}); повторю при первом запросе"),
+        Ok(n) => println!("directory: {n} relays"),
+        Err(e) => eprintln!("directory not available yet ({e}); will retry on the first request"),
     }
     c.spawn_directory_refresh(Duration::from_secs(600));
     let missing: Vec<&str> = RESERVED.iter().copied().filter(|n| !names.reserved().contains_key(*n)).collect();
     if !missing.is_empty() {
-        eprintln!("не заданы адреса: {} (раздел \"reserved\" в конфиге)", missing.join(", "));
+        eprintln!("addresses not set: {} (the \"reserved\" section of the config)", missing.join(", "));
     }
     Arc::new(Gateway { client: c, names, clearnet })
 }
 
 async fn serve_gateway(gw: Arc<Gateway>, listen: &str) {
     let l = tokio::net::TcpListener::bind(listen).await.unwrap_or_else(|e| die(format!("{listen}: {e}")));
-    println!("шлюз: socks5://{listen}  (не-.ov: {:?})", gw.clearnet);
+    println!("gateway: socks5://{listen}  (non-.ov: {:?})", gw.clearnet);
     if let Err(e) = gw.serve(l).await {
         die(e);
     }
@@ -315,37 +319,37 @@ async fn run_browser(a: &Args, cfg: &Config) {
     let proxy = match mode {
         GatewayMode::Never => {
             if !ostp {
-                eprintln!("внимание: ostp не обслуживает .ov — сайты .ov не откроются");
+                eprintln!("warning: ostp does not serve .ov — .ov sites will not open");
             }
             None
         }
         GatewayMode::Auto if ostp => {
-            println!("VPN ostp обслуживает .ov — браузер без прокси");
+            println!("the ostp VPN serves .ov — starting the browser without a proxy");
             None
         }
         _ => {
             if browser::gateway_running(&listen).await {
-                println!("шлюз уже работает на {listen}");
+                println!("gateway already running on {listen}");
             } else {
                 if cfg.relays.is_empty() {
-                    die("нет релеев в конфиге (\"relays\") и нет ostp с overnet; для пробы запустите `overnet demo`");
+                    die("no relays in the config (\"relays\") and no ostp with overnet; to try it out, run `overnet demo`");
                 }
                 let clearnet = Clearnet::parse(&cfg.gateway.clearnet).unwrap_or_else(|e| die(e));
                 let gw = gateway(cfg, clearnet).await;
                 let l = tokio::net::TcpListener::bind(&listen).await.unwrap_or_else(|e| die(format!("{listen}: {e}")));
                 tokio::spawn(gw.serve(l));
-                println!("шлюз: socks5://{listen}");
+                println!("gateway: socks5://{listen}");
             }
             Some(listen)
         }
     };
     let (exe, mullvad) = browser::find_browser(&cfg.browser.path).unwrap_or_else(|e| die(e));
     if !mullvad {
-        eprintln!("внимание: Mullvad Browser не найден, запускаю Firefox — у него нет защиты от отпечатков");
+        eprintln!("warning: Mullvad Browser not found, starting Firefox — it has no fingerprinting protection");
     }
     let profile = data_dir().join("browser-profile");
     browser::write_profile(&profile, proxy.as_deref()).unwrap_or_else(|e| die(e));
-    println!("браузер: {}", exe.display());
+    println!("browser: {}", exe.display());
     match browser::launch(&exe, &profile).await {
         Ok(_) => {}
         Err(e) => die(format!("{}: {e}", exe.display())),
@@ -369,7 +373,7 @@ async fn demo(cfg: &Config) {
         let addr = format!("127.0.0.1:{port}");
         let l = TcpListenerLink::bind(&addr)
             .await
-            .unwrap_or_else(|e| die(format!("{addr}: {e} — демо уже запущено в другом окне?")));
+            .unwrap_or_else(|e| die(format!("{addr}: {e} — is the demo already running in another window?")));
         relays.push(RelayDesc { pubkey: hex::encode(node.pubkey()), address: addr, exit: exit.enabled() });
         let n = node.clone();
         tokio::spawn(async move { n.serve(l).await });
@@ -406,13 +410,13 @@ async fn demo(cfg: &Config) {
         let c = Client::new(Node::new(OnionKey::generate(), ExitPolicy::Off), demo_cfg.relays().unwrap());
         let svc = Service::new(c, key, HashMap::from([(80, local.clone())]));
         let up = svc.ensure_intros().await;
-        println!("{kind}.ov  {}  (точек входа: {up}, локально http://{local})", svc.id().to_address());
+        println!("{kind}.ov  {}  (intro points: {up}, local http://{local})", svc.id().to_address());
         tokio::spawn(svc.run());
     }
     let gw = gateway(&demo_cfg, Clearnet::parse(&cfg.gateway.clearnet).unwrap_or(Clearnet::Direct)).await;
-    println!("\nдемо-сеть работает. В другом окне:");
-    println!("  браузер:    overnet browser --gateway always");
-    println!("  свой сайт:  overnet service --config \"{}\" --key my.key --port 80=127.0.0.1:8080", cfg_file.display());
-    println!("  или любой браузер с SOCKS5 {} и «проксировать DNS».\n", cfg.gateway.listen);
+    println!("\nthe demo network is up. In another window:");
+    println!("  browser:    overnet browser --gateway always");
+    println!("  your site:  overnet service --config \"{}\" --key my.key --port 80=127.0.0.1:8080", cfg_file.display());
+    println!("  or any browser with SOCKS5 {} and \"proxy DNS\" on.\n", cfg.gateway.listen);
     serve_gateway(gw, &cfg.gateway.listen).await;
 }
