@@ -87,6 +87,10 @@ impl Node {
             Ok(keys) => circ.push_hop(&keys).await,
             Err(e) => {
                 circ.destroy().await;
+                // Ответил чужой ключ: соединение пришло не к тому серверу (или
+                // релей сменил ключ). Канал в кэше лежит под ключом релея, и без
+                // этого все следующие цепи шли бы в тот же неверный линк.
+                self.channel_closed(&chan).await;
                 return Err(at_hop(e, first));
             }
         }

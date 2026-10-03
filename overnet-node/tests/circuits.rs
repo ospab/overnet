@@ -204,3 +204,15 @@ async fn socks_gateway_opens_reserved_name() {
     s.read_exact(&mut rep).await.unwrap();
     assert_eq!(rep[1], 2);
 }
+
+/// Соединение «к B» пришло на A (перепутанный NAT/туннель): цепь падает, но
+/// канал не должен остаться в кэше под ключом B — следующая цепь к B строится.
+#[tokio::test]
+async fn misrouted_first_hop_does_not_poison_the_channel() {
+    let (_nodes, descs) = network(2).await;
+    let client = Node::new(OnionKey::generate(), ExitPolicy::Off);
+    let wrong = RelayDesc { address: descs[0].address.clone(), ..descs[1].clone() };
+    let err = client.build_circuit(&[wrong]).await.err().expect("wrong server must fail").to_string();
+    assert!(err.contains("authentication"), "{err}");
+    client.build_circuit(&[descs[1].clone()]).await.expect("fresh channel to the real relay");
+}
