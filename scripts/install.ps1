@@ -29,6 +29,55 @@ Write-Host "========================================================"
 Write-Host " overnet installer"
 Write-Host "========================================================"
 
+# Скачать файл со строкой прогресса: [#####-----] 45%  98.1 / 217.0 MB  12.3 MB/s.
+# Свой индикатор, а не Invoke-WebRequest: его прогресс в Windows PowerShell 5.1
+# замедляет скачивание в разы. Ошибка (404 и т.п.) — исключение, как у него.
+function Get-File([string]$Uri, [string]$OutFile) {
+    Add-Type -AssemblyName System.Net.Http
+    $client = New-Object System.Net.Http.HttpClient
+    $client.Timeout = [TimeSpan]::FromMinutes(30)
+    try {
+        $resp = $client.GetAsync($Uri, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
+        [void]$resp.EnsureSuccessStatusCode()
+        $total = $resp.Content.Headers.ContentLength
+        $in = $resp.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
+        $out = [System.IO.File]::Create($OutFile)
+        try {
+            $buf = New-Object byte[] 262144
+            $done = 0L
+            $watch = [Diagnostics.Stopwatch]::StartNew()
+            $last = -1000
+            while (($n = $in.Read($buf, 0, $buf.Length)) -gt 0) {
+                $out.Write($buf, 0, $n)
+                $done += $n
+                $ms = $watch.ElapsedMilliseconds
+                if ($ms - $last -ge 200) { $last = $ms; Show-Progress $done $total $ms }
+            }
+            Show-Progress $done $total $watch.ElapsedMilliseconds
+            Write-Host ""
+        } finally {
+            $out.Close()
+            $in.Close()
+        }
+    } finally {
+        $client.Dispose()
+    }
+}
+
+function Show-Progress([long]$done, $total, [long]$ms) {
+    $mb = $done / 1MB
+    $speed = if ($ms -gt 0) { "{0,6:N1} MB/s" -f ($mb / ($ms / 1000.0)) } else { "" }
+    if ($total -gt 0) {
+        $frac = [Math]::Min(1.0, $done / [double]$total)
+        $fill = [int][Math]::Floor($frac * 30)
+        $bar = ("#" * $fill) + ("-" * (30 - $fill))
+        $line = "  [{0}] {1,3}%  {2,6:N1} / {3:N1} MB  {4}" -f $bar, [int]($frac * 100), $mb, ($total / 1MB), $speed
+    } else {
+        $line = "  {0,6:N1} MB  {1}" -f $mb, $speed
+    }
+    Write-Host -NoNewline "`r$line"
+}
+
 function Set-UserPath([bool]$add) {
     $p = [Environment]::GetEnvironmentVariable("Path", "User")
     $parts = @($p -split ";" | Where-Object { $_ -and $_ -ne $InstallDir })
@@ -78,7 +127,7 @@ $zip = Join-Path $tmp $archive
 
 Write-Host "Downloading: $archive ($tag)"
 try {
-    Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+    Get-File -Uri $url -OutFile $zip
 } catch {
     Write-Error "Download failed: $url"
     exit 1
@@ -121,7 +170,7 @@ function Install-Browser {
     $bzip = Join-Path $btmp $name
     Write-Host "Downloading: $name ($tag, about 220 MB)"
     try {
-        Invoke-WebRequest -Uri $burl -OutFile $bzip -UseBasicParsing
+        Get-File -Uri $burl -OutFile $bzip
     } catch {
         Write-Host "[notice] $tag has no overnet browser build; skipping the browser."
         Remove-Item $btmp -Recurse -Force

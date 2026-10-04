@@ -127,7 +127,8 @@ URL="https://github.com/${GITHUB_REPO}/releases/download/${TAG}/${ARCHIVE}"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 echo "Downloading: $ARCHIVE ($TAG)"
-HTTP_CODE=$(curl -sL -w "%{http_code}" "$URL" -o "$TMP/$ARCHIVE")
+# Полоса прогресса curl идёт в stderr; код ответа (-w) — в stdout.
+HTTP_CODE=$(curl -L --progress-bar -w "%{http_code}" "$URL" -o "$TMP/$ARCHIVE")
 if [ "$HTTP_CODE" != "200" ]; then
     echo "[error] Download failed (HTTP $HTTP_CODE): $URL"
     exit 1
