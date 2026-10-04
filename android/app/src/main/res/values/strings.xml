@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">overnet browser</string>
+    <string name="address_hint">Search or enter a .ov address</string>
+    <string name="new_tab_title">New tab</string>
+
+    <string name="status_connecting">Connecting to overnet…</string>
+    <string name="status_connected">Connected to overnet: %1$d relays</string>
+    <string name="status_failed">overnet did not start: %1$s</string>
+    <string name="status_regular_sites">Regular sites are blocked here: they open in your regular browser, so your real address never sits next to your .ov visits.</string>
+    <string name="new_circuits">New circuits</string>
+    <string name="new_circuits_done">New circuits for everything you open next</string>
+
+    <string name="back">Back</string>
+    <string name="forward">Forward</string>
+    <string name="reload">Reload</string>
+    <string name="stop">Stop</string>
+    <string name="share">Share</string>
+    <string name="new_tab">New tab</string>
+    <string name="tabs">Tabs</string>
+    <string name="close_all">Close all</string>
+    <string name="close_tab">Close tab</string>
+    <string name="home">Start page</string>
+    <string name="copy_link">Copy link</string>
+    <string name="share_link">Share link</string>
+    <string name="link_copied">Link copied</string>
+    <string name="open_in_new_tab">Open in new tab</string>
+    <string name="open_image">Open image in new tab</string>
+    <string name="copy_image_link">Copy image link</string>
+    <string name="network">Network</string>
+    <string name="close">Close</string>
+    <string name="no_app">No app to open this link</string>
+
+    <string name="download_started">Downloading %1$s</string>
+    <string name="download_done">Saved to Downloads: %1$s</string>
+    <string name="download_saved_app">Saved: %1$s</string>
+    <string name="download_failed">Download failed: %1$s</string>
+    <string name="open">Open</string>
+
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="username">User name</string>
+    <string name="password">Password</string>
+    <string name="sign_in">Sign in</string>
+    <string name="leave_title">Leave this page?</string>
+    <string name="leave_message">What you entered may not be saved.</string>
+    <string name="leave">Leave</string>
+    <string name="stay">Stay</string>
+    <string name="resend_title">Send the form again?</string>
+    <string name="resend_message">The page will send the data you entered once more.</string>
+    <string name="resend">Send</string>
+    <string name="tab_crashed">This tab crashed. Reload it to try again.</string>
+</resources>

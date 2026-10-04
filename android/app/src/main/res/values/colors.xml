@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The overnet design tokens (design/overnet.css), dark theme. -->
+<resources>
+    <color name="icon_bg">#161826</color>
+    <color name="bg">#161826</color>
+    <color name="surface">#1E2030</color>
+    <color name="surface_2">#282B3B</color>
+    <color name="text">#E9E9ED</color>
+    <color name="text_2">#CFD3E5</color>
+    <color name="muted">#9DA1B5</color>
+    <color name="faint">#5F6374</color>
+    <color name="line">#3B3E4E</color>
+    <color name="line_soft">#2A2C3B</color>
+    <color name="accent">#9184D9</color>
+    <color name="accent_text">#B5ABFC</color>
+    <color name="accent_tint">#2B2741</color>
+    <color name="accent_tint_2">#3A3360</color>
+    <color name="ok">#7CC79A</color>
+    <color name="err">#EC8F84</color>
+    <color name="warn">#DCB66E</color>
+</resources>

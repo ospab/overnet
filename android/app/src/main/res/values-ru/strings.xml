@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">overnet browser</string>
+    <string name="address_hint">Поиск или адрес .ov</string>
+    <string name="new_tab_title">Новая вкладка</string>
+
+    <string name="status_connecting">Подключение к overnet…</string>
+    <string name="status_connected">Подключено к overnet: релеев — %1$d</string>
+    <string name="status_failed">overnet не запустился: %1$s</string>
+    <string name="status_regular_sites">Обычные сайты здесь закрыты: они открываются в вашем обычном браузере, чтобы ваш настоящий адрес не оказался рядом с посещениями .ov.</string>
+    <string name="new_circuits">Новые цепи</string>
+    <string name="new_circuits_done">Новые цепи для всего, что откроете дальше</string>
+
+    <string name="back">Назад</string>
+    <string name="forward">Вперёд</string>
+    <string name="reload">Обновить</string>
+    <string name="stop">Остановить</string>
+    <string name="share">Поделиться</string>
+    <string name="new_tab">Новая вкладка</string>
+    <string name="tabs">Вкладки</string>
+    <string name="close_all">Закрыть все</string>
+    <string name="close_tab">Закрыть вкладку</string>
+    <string name="home">Стартовая страница</string>
+    <string name="copy_link">Копировать ссылку</string>
+    <string name="share_link">Поделиться ссылкой</string>
+    <string name="link_copied">Ссылка скопирована</string>
+    <string name="open_in_new_tab">Открыть в новой вкладке</string>
+    <string name="open_image">Открыть картинку в новой вкладке</string>
+    <string name="copy_image_link">Копировать ссылку на картинку</string>
+    <string name="network">Сеть</string>
+    <string name="close">Закрыть</string>
+    <string name="no_app">Нет приложения, чтобы открыть ссылку</string>
+
+    <string name="download_started">Загрузка: %1$s</string>
+    <string name="download_done">Сохранено в «Загрузки»: %1$s</string>
+    <string name="download_saved_app">Сохранено: %1$s</string>
+    <string name="download_failed">Не удалось скачать: %1$s</string>
+    <string name="open">Открыть</string>
+
+    <string name="ok">OK</string>
+    <string name="cancel">Отмена</string>
+    <string name="username">Имя пользователя</string>
+    <string name="password">Пароль</string>
+    <string name="sign_in">Войти</string>
+    <string name="leave_title">Уйти со страницы?</string>
+    <string name="leave_message">Введённое может не сохраниться.</string>
+    <string name="leave">Уйти</string>
+    <string name="stay">Остаться</string>
+    <string name="resend_title">Отправить форму ещё раз?</string>
+    <string name="resend_message">Страница снова отправит введённые данные.</string>
+    <string name="resend">Отправить</string>
+    <string name="tab_crashed">Вкладка упала. Обновите её, чтобы попробовать снова.</string>
+</resources>
