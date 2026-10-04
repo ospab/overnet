@@ -624,7 +624,7 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
 name = "ostp-core"
-version = "0.4.6"
+version = "0.4.7"
 dependencies = [
  "anyhow",
  "base64",
@@ -646,7 +646,7 @@ dependencies = [
 
 [[package]]
 name = "overnet-android"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "jni",
  "overnet-cli",
@@ -657,7 +657,7 @@ dependencies = [
 
 [[package]]
 name = "overnet-cli"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "axum",
  "hex",
@@ -673,7 +673,7 @@ dependencies = [
 
 [[package]]
 name = "overnet-core"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "chacha20",
@@ -692,7 +692,7 @@ dependencies = [
 
 [[package]]
 name = "overnet-link-ostp"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "bytes",
@@ -704,7 +704,7 @@ dependencies = [
 
 [[package]]
 name = "overnet-link-tcp"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "hmac",
@@ -716,7 +716,7 @@ dependencies = [
 
 [[package]]
 name = "overnet-node"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "base64",
@@ -732,7 +732,7 @@ dependencies = [
 
 [[package]]
 name = "overnet-sites"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "axum",
  "data-encoding",
