@@ -58,6 +58,15 @@ fn which(name: &str) -> Option<PathBuf> {
 }
 
 /// Найти браузер: явный путь, Mullvad Browser, затем Firefox (с предупреждением).
+/// Установленный overnet browser (scripts/install.ps1 кладёт его сюда).
+pub fn overnet_browser() -> Option<PathBuf> {
+    if !cfg!(windows) {
+        return None;
+    }
+    let base = PathBuf::from(std::env::var_os("LOCALAPPDATA")?);
+    Some(base.join("Programs/overnet-browser/Browser/overnet-browser.exe")).filter(|p| p.exists())
+}
+
 pub fn find_browser(configured: &str) -> Result<(PathBuf, bool), String> {
     if !configured.is_empty() {
         let p = PathBuf::from(configured);

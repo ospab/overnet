@@ -95,14 +95,16 @@ jobs:
           Write-Host "Mullvad Browser $($d.version): $($w.binary)"
           Invoke-WebRequest $w.binary -OutFile mb.exe
           Invoke-WebRequest $w.sig -OutFile mb.exe.asc
-          Invoke-WebRequest https://mullvad.net/media/mullvad-code-signing.asc -OutFile mullvad-signing.asc
           "MULLVAD_VERSION=$($d.version)" >> $env:GITHUB_ENV
 
+      # Mullvad Browser собирает и подписывает Tor Project: ключ «Tor Browser
+      # Developers» берём через WKD и сверяем отпечаток основного ключа.
       - name: Verify the signature
         shell: bash
         run: |
-          gpg --batch --import mullvad-signing.asc
-          gpg --batch --verify mb.exe.asc mb.exe
+          gpg --batch --auto-key-locate nodefault,wkd --locate-keys torbrowser@torproject.org
+          gpg --batch --status-fd 1 --verify mb.exe.asc mb.exe | tee verify.txt
+          grep -E "^\[GNUPG:\] VALIDSIG .* EF6E286DDA85EA2A4BA7DE684E2C6E8793298290$" verify.txt
 
       - name: Unpack
         shell: pwsh
@@ -115,16 +117,18 @@ jobs:
           Invoke-WebRequest https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe -OutFile rcedit.exe
 
       - name: Repack
-        run: python browser/repack.py --mullvad "${{ env.MULLVAD_DIR }}" --overnet ov/overnet.exe --out dist/overnet-browser --rcedit rcedit.exe
+        run: python browser/repack.py --mullvad "${{ env.MULLVAD_DIR }}" --overnet ov/overnet.exe --out dist/overnet-browser/Browser --rcedit rcedit.exe
 
       - name: Smoke test
-        run: python browser/smoke.py dist/overnet-browser/overnet-browser.exe shots --offline
+        run: python browser/smoke.py dist/overnet-browser/Browser/overnet-browser.exe shots --offline
 
       - name: Package
         shell: pwsh
         run: |
           $name = "overnet-browser-windows-amd64.zip"
-          7z a -tzip -mx=7 $name ./dist/overnet-browser | Out-Null
+          # В архиве — папка Browser: профиль переносной сборки ляжет рядом, в Data.
+          Remove-Item dist/overnet-browser/Data -Recurse -Force -ErrorAction SilentlyContinue
+          7z a -tzip -mx=7 $name ./dist/overnet-browser/Browser | Out-Null
           "$((Get-FileHash $name -Algorithm SHA256).Hash.ToLower())  $name" | Out-File -Encoding ascii -NoNewline "$name.sha256"
           Write-Host "Mullvad Browser $env:MULLVAD_VERSION -> $name ($([math]::Round((Get-Item $name).Length/1MB)) MB)"
 

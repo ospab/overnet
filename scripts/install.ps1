@@ -5,10 +5,14 @@
 #
 # Права администратора не нужны: бинарник — в %LOCALAPPDATA%\Programs\overnet
 # (добавляется в PATH пользователя), конфиг — в %LOCALAPPDATA%\overnet\config.json,
-# где overnet ищет его без --config. Повторный запуск обновляет бинарник.
+# где overnet ищет его без --config. overnet browser — в
+# %LOCALAPPDATA%\Programs\overnet-browser (Browser\ — программа, Data\ — профиль),
+# с ярлыком в меню «Пуск»; -NoBrowser — без него. Повторный запуск обновляет всё,
+# профиль браузера остаётся.
 param(
     [string]$Version = "",
     [string]$ConfigUrl = "",
+    [switch]$NoBrowser,
     [switch]$Uninstall
 )
 
@@ -18,6 +22,8 @@ $repo = "ospab/overnet"
 $InstallDir = Join-Path $env:LOCALAPPDATA "Programs\overnet"
 $DataDir = if ($env:OVERNET_HOME) { $env:OVERNET_HOME } else { Join-Path $env:LOCALAPPDATA "overnet" }
 $ConfigFile = Join-Path $DataDir "config.json"
+$BrowserDir = Join-Path $env:LOCALAPPDATA "Programs\overnet-browser"
+$Shortcut = Join-Path ([Environment]::GetFolderPath("Programs")) "overnet browser.lnk"
 
 Write-Host "========================================================"
 Write-Host " overnet installer"
@@ -31,10 +37,15 @@ function Set-UserPath([bool]$add) {
 }
 
 if ($Uninstall) {
-    Stop-Process -Name "overnet" -Force -ErrorAction SilentlyContinue
+    Stop-Process -Name "overnet-browser", "overnet" -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 500
     if (Test-Path $InstallDir) { Remove-Item $InstallDir -Recurse -Force }
+    $browserBin = Join-Path $BrowserDir "Browser"
+    if (Test-Path $browserBin) { Remove-Item $browserBin -Recurse -Force }
+    Remove-Item $Shortcut -Force -ErrorAction SilentlyContinue
     Set-UserPath $false
-    Write-Host "overnet removed. Config and data ($DataDir) were kept; delete them by hand if you don't need them."
+    Write-Host "overnet removed. Config and data ($DataDir) and the browser profile ($BrowserDir\Data)"
+    Write-Host "were kept; delete them by hand if you don't need them."
     return  # не exit: при запуске через iex он закрыл бы окно
 }
 
@@ -101,7 +112,50 @@ Set-UserPath $true
 $env:Path = "$env:Path;$InstallDir"
 Write-Host "Installed: $InstallDir\overnet.exe ($tag)"
 
-# 4. Конфиг
+# 4. overnet browser
+function Install-Browser {
+    $name = "overnet-browser-windows-$arch.zip"
+    $burl = "https://github.com/$repo/releases/download/$tag/$name"
+    $btmp = Join-Path $env:TEMP "overnet_browser_$PID"
+    New-Item -ItemType Directory -Path $btmp -Force | Out-Null
+    $bzip = Join-Path $btmp $name
+    Write-Host "Downloading: $name ($tag, about 110 MB)"
+    try {
+        Invoke-WebRequest -Uri $burl -OutFile $bzip -UseBasicParsing
+    } catch {
+        Write-Host "[notice] $tag has no overnet browser build; skipping the browser."
+        Remove-Item $btmp -Recurse -Force
+        return
+    }
+    $want = ""
+    try {
+        Invoke-WebRequest -Uri "$burl.sha256" -OutFile "$bzip.sha256" -UseBasicParsing
+        $want = ((Get-Content "$bzip.sha256" -Raw).Trim() -split "\s+")[0]
+    } catch { }
+    if ($want) {
+        if ($want -ne (Get-FileHash $bzip -Algorithm SHA256).Hash) { Write-Error "Checksum mismatch for $name." }
+        Write-Host "Checksum OK."
+    }
+    Stop-Process -Name "overnet-browser" -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 800
+    # Заменяем только программу; профиль (Data\) остаётся.
+    $bin = Join-Path $BrowserDir "Browser"
+    if (Test-Path $bin) { Remove-Item $bin -Recurse -Force }
+    New-Item -ItemType Directory -Path $BrowserDir -Force | Out-Null
+    Expand-Archive -Path $bzip -DestinationPath $BrowserDir -Force
+    Remove-Item $btmp -Recurse -Force
+    $exe = Join-Path $bin "overnet-browser.exe"
+    $ws = New-Object -ComObject WScript.Shell
+    $lnk = $ws.CreateShortcut($Shortcut)
+    $lnk.TargetPath = $exe
+    $lnk.WorkingDirectory = $bin
+    $lnk.Description = "overnet browser"
+    $lnk.Save()
+    Write-Host "Installed: overnet browser ($exe), Start menu: overnet browser"
+}
+if (-not $NoBrowser) { Install-Browser }
+
+# 5. Конфиг
 New-Item -ItemType Directory -Path $DataDir -Force | Out-Null
 $first = -not (Test-Path $ConfigFile)
 if ($first) {
@@ -119,5 +173,10 @@ if ($first) {
 Write-Host "--------------------------------------------------------"
 Write-Host "The network's relays and service addresses are built in; $ConfigFile"
 Write-Host "only needs changes for a network of your own."
-Write-Host "Open a new terminal, then: overnet browser    Help: overnet help"
+if ($NoBrowser) {
+    Write-Host "Open a new terminal, then: overnet browser    Help: overnet help"
+} else {
+    Write-Host "Start overnet browser from the Start menu (or: overnet browser)."
+    Write-Host "Help: overnet help    Update later: overnet update"
+}
 Write-Host "--------------------------------------------------------"

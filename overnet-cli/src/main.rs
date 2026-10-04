@@ -45,7 +45,7 @@ Client:
   overnet gateway [--listen A] [--clearnet direct|exit|block]
                                         local SOCKS5 gateway (127.0.0.1:9150)
   overnet browser [--gateway auto|always|never]
-                                        Mullvad Browser with the overnet profile
+                                        overnet browser (or Mullvad Browser with an overnet profile)
   overnet resolve <name.ov>             what a name resolves to
 
   overnet demo                          the whole network on this machine: relays, sites, gateway
@@ -354,6 +354,16 @@ async fn serve_gateway(gw: Arc<Gateway>, listen: &str) {
 
 async fn run_browser(a: &Args, cfg: &Config) {
     use browser::GatewayMode;
+    // overnet browser сам запускает свой шлюз: просто открываем его.
+    if cfg.browser.path.is_empty() && std::env::var_os("OVERNET_BROWSER").is_none() {
+        if let Some(exe) = browser::overnet_browser() {
+            match std::process::Command::new(&exe).spawn() {
+                Ok(_) => println!("overnet browser: {}", exe.display()),
+                Err(e) => die(format!("{}: {e}", exe.display())),
+            }
+            return;
+        }
+    }
     let mode = GatewayMode::parse(a.flag("gateway").unwrap_or(&cfg.browser.gateway)).unwrap_or_else(|e| die(e));
     let listen = cfg.gateway.listen.clone();
     let ostp = browser::ostp_serves_ov().await;
