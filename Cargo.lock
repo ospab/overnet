@@ -2211,7 +2211,7 @@ dependencies = [
 
 [[package]]
 name = "overnet-cli"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "axum",
  "hex",
@@ -2227,7 +2227,7 @@ dependencies = [
 
 [[package]]
 name = "overnet-core"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "async-trait",
  "chacha20",
@@ -2246,7 +2246,7 @@ dependencies = [
 
 [[package]]
 name = "overnet-link-ostp"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "async-trait",
  "bytes",
@@ -2258,7 +2258,7 @@ dependencies = [
 
 [[package]]
 name = "overnet-link-tcp"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "async-trait",
  "hmac",
@@ -2270,7 +2270,7 @@ dependencies = [
 
 [[package]]
 name = "overnet-node"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -2286,7 +2286,7 @@ dependencies = [
 
 [[package]]
 name = "overnet-sites"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "axum",
  "data-encoding",
