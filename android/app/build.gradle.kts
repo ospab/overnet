@@ -2,7 +2,6 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
 }
 
 // Version from the workspace Cargo.toml: 0.2.5 -> versionCode 205.
@@ -12,7 +11,8 @@ val (vMajor, vMinor, vPatch) = cargoVersion.split('.').map { it.takeWhile(Char::
 
 android {
     namespace = "com.ospab.overnet"
-    compileSdk = 36
+    // GeckoView 157 and its androidx.core need API 37 to compile against.
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.ospab.overnet"
