@@ -163,7 +163,7 @@ jobs:
           path: shots
 
   # Android: overnet browser на GeckoView со шлюзом overnet внутри (android/,
-  # overnet-android). Один APK на процессор.
+  # overnet-android). Один APK на процессор: arm64 и 32-битный ARM.
   android:
     runs-on: ubuntu-latest
     defaults:
@@ -179,7 +179,7 @@ jobs:
           path: ostp
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+          targets: aarch64-linux-android,armv7-linux-androideabi
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: overnet
@@ -203,7 +203,7 @@ jobs:
         env:
           ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
         run: >
-          cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 --platform 26
+          cargo ndk -t arm64-v8a -t armeabi-v7a --platform 26
           -o android/app/src/main/jniLibs build --release -p overnet-android
 
       # Ключ подписи из секретов; без них APK подписан отладочным ключом.
@@ -221,7 +221,7 @@ jobs:
           fi
           gradle --no-daemon assembleRelease
           cd app/build/outputs/apk/release
-          for abi in arm64-v8a armeabi-v7a x86_64; do
+          for abi in arm64-v8a armeabi-v7a; do
             name=overnet-browser-android-$abi.apk
             mv app-$abi-release.apk "$GITHUB_WORKSPACE/$name"
             (cd "$GITHUB_WORKSPACE" && sha256sum "$name" > "$name.sha256" && ls -la "$name")
