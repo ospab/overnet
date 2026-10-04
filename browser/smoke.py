@@ -66,7 +66,7 @@ class Marionette:
 
 
 def main():
-    exe = Path(sys.argv[1])
+    exe = Path(sys.argv[1]).resolve()
     args = [a for a in sys.argv[2:] if not a.startswith("--")]
     shots = Path(args[0]) if args else None
     profile = tempfile.mkdtemp(prefix="ob-profile-")

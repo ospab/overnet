@@ -147,6 +147,22 @@ class ToolkitJar:
         return {}
 
 
+def clean_nsis(out: Path) -> None:
+    """Убрать то, что 7z достаёт из NSIS-установщика Mullvad сверх браузера:
+    служебное NSIS и вторую копию браузера в папке Browser, которая в Windows
+    сливается с настоящей browser (в ней должны быть только omni.ja и плитки,
+    как в установленном Mullvad Browser)."""
+    shutil.rmtree(out / "$PLUGINSDIR", ignore_errors=True)
+    for f in out.glob("*.nsis"):
+        f.unlink()
+    for child in list((out / "browser").iterdir()):
+        if child.name.lower() not in ("omni.ja", "visualelements", "features"):
+            if child.is_dir():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--mullvad", required=True, type=Path)
@@ -166,6 +182,7 @@ def main() -> None:
 
     for f in DROP:
         (out / f).unlink(missing_ok=True)
+    clean_nsis(out)
     (out / "distribution" / "extensions" / MULLVAD_EXTENSION).unlink(missing_ok=True)
 
     (out / "mullvadbrowser.exe").rename(out / EXE)

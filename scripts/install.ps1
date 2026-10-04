@@ -78,6 +78,31 @@ function Show-Progress([long]$done, $total, [long]$ms) {
     Write-Host -NoNewline "`r$line"
 }
 
+# Распаковать zip. Не Expand-Archive: в Windows PowerShell 5.1 он падает на
+# именах с «$» и при ошибке откатывает всю распаковку. Служебное NSIS ($PLUGINSDIR,
+# *.nsis), попавшее в архивы v0.2.3, пропускаем; пути вне $Dest — тоже.
+function Expand-Zip([string]$Zip, [string]$Dest) {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $root = [System.IO.Path]::GetFullPath($Dest).TrimEnd('\') + '\'
+    $z = [System.IO.Compression.ZipFile]::OpenRead($Zip)
+    try {
+        foreach ($e in $z.Entries) {
+            $name = $e.FullName
+            if ($name -match '(^|/)\$' -or $name.EndsWith('.nsis')) { continue }
+            $path = [System.IO.Path]::GetFullPath((Join-Path $Dest ($name -replace '/', '\')))
+            if (-not $path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { continue }
+            if ($name.EndsWith('/')) {
+                New-Item -ItemType Directory -Path $path -Force | Out-Null
+                continue
+            }
+            New-Item -ItemType Directory -Path (Split-Path $path) -Force | Out-Null
+            [System.IO.Compression.ZipFileExtensions]::ExtractToFile($e, $path, $true)
+        }
+    } finally {
+        $z.Dispose()
+    }
+}
+
 function Set-UserPath([bool]$add) {
     $p = [Environment]::GetEnvironmentVariable("Path", "User")
     $parts = @($p -split ";" | Where-Object { $_ -and $_ -ne $InstallDir })
@@ -191,8 +216,11 @@ function Install-Browser {
     $bin = Join-Path $BrowserDir "Browser"
     if (Test-Path $bin) { Remove-Item $bin -Recurse -Force }
     New-Item -ItemType Directory -Path $BrowserDir -Force | Out-Null
-    Expand-Archive -Path $bzip -DestinationPath $BrowserDir -Force
-    Remove-Item $btmp -Recurse -Force
+    try {
+        Expand-Zip $bzip $BrowserDir
+    } finally {
+        Remove-Item $btmp -Recurse -Force -ErrorAction SilentlyContinue
+    }
     $exe = Join-Path $bin "overnet-browser.exe"
     $ws = New-Object -ComObject WScript.Shell
     $lnk = $ws.CreateShortcut($Shortcut)
