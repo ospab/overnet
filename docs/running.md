@@ -31,8 +31,8 @@ The network follows Tor's design, without Tor's infrastructure:
   from a relay through a circuit. Bootstrap only knows relays (they are public
   by nature).
 
-The old request/response stack and its commands live under `overnet legacy …`;
-the Tauri app still runs on it. The old `REGISTER` weakness (anyone could claim
+The old request/response stack and its commands live under `overnet legacy …`.
+The old `REGISTER` weakness (anyone could claim
 someone else's key) does not exist in v0.2: a service takes an introduction
 point with a signature bound to a specific circuit.
 

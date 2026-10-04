@@ -51,7 +51,5 @@ On server 3 (IP: `SERVER_3_IP`):
 You now have the path `Relay 1 -> Relay 2 -> Service` and know the `pubkey` of
 each node.
 
-In `overnet-browser` (or a future client) you would enter the routing path.
-While the browser was being finished, this could be tested through the Rust API
-of `overnet-browser`, giving it the `pubkey` of all three nodes. (For the Tauri
-UI these pubkeys had to be added to the client configuration.)
+The v0.1 client (a Tauri app, since removed from the repository) took this
+routing path with the `pubkey` of all three nodes.
