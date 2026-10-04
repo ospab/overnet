@@ -1,0 +1,17 @@
+[package]
+name = "overnet-android"
+version.workspace = true
+edition = "2021"
+license = "AGPL-3.0"
+description = "JNI bindings: the overnet gateway inside the Android app"
+
+[lib]
+name = "overnet_android"
+crate-type = ["cdylib"]
+
+[dependencies]
+jni = "0.21"
+tokio = { workspace = true }
+serde_json = "1.0"
+overnet-cli = { path = "../overnet-cli" }
+overnet-node = { path = "../overnet-node" }

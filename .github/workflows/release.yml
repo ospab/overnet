@@ -162,8 +162,78 @@ jobs:
           name: browser-smoke-screenshots
           path: shots
 
+  # Android: overnet browser на GeckoView со шлюзом overnet внутри (android/,
+  # overnet-android). Один APK на процессор.
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: overnet
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: overnet
+      - uses: actions/checkout@v4
+        with:
+          repository: ospab/ostp
+          path: ostp
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: overnet
+          key: android
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r28c
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.5"
+
+      - name: Rust library
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+        run: >
+          cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 --platform 26
+          -o android/app/src/main/jniLibs build --release -p overnet-android
+
+      # Ключ подписи из секретов; без них APK подписан отладочным ключом.
+      - name: APK
+        working-directory: overnet/android
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          OVERNET_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/overnet.jks"
+            export OVERNET_KEYSTORE="$RUNNER_TEMP/overnet.jks"
+          else
+            echo "::warning::no ANDROID_KEYSTORE_B64 secret: the APK is signed with a debug key"
+          fi
+          gradle --no-daemon assembleRelease
+          cd app/build/outputs/apk/release
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            name=overnet-browser-android-$abi.apk
+            mv app-$abi-release.apk "$GITHUB_WORKSPACE/$name"
+            (cd "$GITHUB_WORKSPACE" && sha256sum "$name" > "$name.sha256" && ls -la "$name")
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: overnet-browser-android
+          path: overnet-browser-android-*
+
   release:
-    needs: [build, browser]
+    needs: [build, browser, android]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:

@@ -5,6 +5,7 @@ members = [
     "overnet-link-ostp",
     "overnet-node",
     "overnet-cli",
+    "overnet-android",
     "overnet-sites",
 ]
 resolver = "2"

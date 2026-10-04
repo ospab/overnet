@@ -35,6 +35,17 @@ pub async fn start_gateway(
     clearnet: Clearnet,
     open_external: bool,
 ) -> Result<Arc<Gateway>, String> {
+    Ok(start_gateway_with_ui(relays, reserved, clearnet, open_external).await?.0)
+}
+
+/// [`start_gateway`], also returning the `browser.ov` state: the Android app
+/// reads its token to handle "Open in my regular browser" itself.
+pub async fn start_gateway_with_ui(
+    relays: Vec<RelayDesc>,
+    reserved: &HashMap<String, String>,
+    clearnet: Clearnet,
+    open_external: bool,
+) -> Result<(Arc<Gateway>, Arc<browser_ui::Ui>), String> {
     let c = Client::new(Node::new(OnionKey::generate(), ExitPolicy::Off), relays);
     let names = Names::new(c.clone(), reserved).map_err(|e| e.to_string())?;
     {
@@ -52,7 +63,7 @@ pub async fn start_gateway(
         eprintln!("addresses not set: {} (the \"reserved\" section of the config)", missing.join(", "));
     }
     let ui = Arc::new(browser_ui::Ui::new(c.clone(), clearnet, open_external));
-    let ui_addr = serve_http(browser_ui::router(ui), "127.0.0.1:0").await.map_err(|e| e.to_string())?;
+    let ui_addr = serve_http(browser_ui::router(ui.clone()), "127.0.0.1:0").await.map_err(|e| e.to_string())?;
     let local = [("browser.ov".to_string(), ui_addr.parse().expect("loopback address"))].into_iter().collect();
-    Ok(Arc::new(Gateway { client: c, names, clearnet, local }))
+    Ok((Arc::new(Gateway { client: c, names, clearnet, local }), ui))
 }
