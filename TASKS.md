@@ -1,50 +1,59 @@
-# overnet — сборник задач (handoff)
+**English** · [Русский](TASKS.ru.md)
 
-*Создан 2026-06-23. Для продолжения работы с другим ИИ (напр. Gemini 3.1 pro),
-пока основной ассистент на cooldown. Документ самодостаточный — читается с холода.*
+> **A historical document (June 2026).** Tasks 1 and 3 were solved differently
+> in v0.2: Tor-style circuits, `.ov` services, a SOCKS5 gateway — see
+> [docs/running.md](docs/running.md).
+
+# overnet — task collection (handoff)
+
+*Created 2026-06-23. For continuing the work with another AI while the main
+assistant was on cooldown. The document is self-contained — it can be read cold.*
 
 ---
 
-## 0. Контекст (прочитать первым)
+## 0. Context (read first)
 
-**overnet** — censorship-resistant децентрализованная onion-mesh сеть. Цель:
-связь, переживающая блокировки ТСПУ и закрытие границы. Подробности — в `docs/`:
-`philosophy.md`, `architecture.md`, `threat-model.md`, `app-protocol.md`,
-`naming.md`, `plan.md`, `glossary.md` (термины простым языком).
+**overnet** is a censorship-resistant decentralized onion mesh network. Goal:
+communication that survives national DPI blocking and a closed border. Details
+are in `docs/`: `philosophy.md`, `architecture.md`, `threat-model.md`,
+`app-protocol.md`, `naming.md`, `plan.md`, `glossary.md` (terms in plain
+language).
 
-**Стек:** Rust, плоский cargo-workspace, лицензия `AGPL-3.0-only`. Async — `tokio`.
+**Stack:** Rust, a flat cargo workspace, license `AGPL-3.0-only`. Async — `tokio`.
 
-**Золотые правила (НЕ нарушать):**
-1. **Не катать свою крипту.** Только проверенные крейты: `x25519-dalek`,
-   `chacha20poly1305`, `snow` (Noise), `ed25519-dalek`, `sha2`. Новизна — в
-   конструкции, не в примитивах.
-2. **Не переписывать `ostp`.** overnet зависит от `ostp-core` по path
-   (`../../ostp/ostp-core`). Низ (Reality-мимикрия, Noise-туннель, паддинг) берём
-   оттуда. См. задачу 4.
-3. **Никаких фейковых заглушек, выдаваемых за рабочее.** Если не реализовано —
-   честный `TODO`. Всё, что коммитится, должно компилироваться.
-4. **`cargo test` должен быть зелёным.** На каждую задачу — тесты.
-5. **Стиль:** комментарии на русском, как в существующем коде; смотри
-   `overnet-core/src/*.rs` как образец.
+**Golden rules (do NOT break):**
+1. **Don't roll your own crypto.** Only proven crates: `x25519-dalek`,
+   `chacha20poly1305`, `snow` (Noise), `ed25519-dalek`, `sha2`. The novelty is in
+   the construction, not the primitives.
+2. **Don't rewrite `ostp`.** overnet depends on `ostp-core` by path
+   (`../../ostp/ostp-core`). The lower layers (Reality mimicry, the Noise tunnel,
+   padding) come from there. See task 4.
+3. **No fake stubs passed off as working code.** If something isn't implemented,
+   an honest `TODO`. Everything committed must compile.
+4. **`cargo test` must be green.** Tests for every task.
+5. **Style:** follow the existing code; see `overnet-core/src/*.rs` as an
+   example.
 
-**Как собрать/проверить:**
+**Building / checking:**
 ```
 cd overnet
-cargo test --workspace      # всё зелёное на момент написания
-cargo run -p overnet-cli    # сгенерит личность; команды server/client
+cargo test --workspace      # all green at the time of writing
+cargo run -p overnet-cli    # generates an identity; server/client commands
 ```
 
-### Текущее состояние (что уже готово и протестировано)
+### Current state (what's done and tested)
 
-Крейты (плоско в корне `overnet/`):
-- `overnet-core` — **готово:** `Identity`, `Address`, `Link` (trait), `session`
-  (Noise), `onion` (слои). 7 тестов зелёные.
-- `overnet-link-tcp` — **готово:** `TcpLink` (length-framed) + `TcpListenerLink`.
-- `overnet-node` — **готово:** `serve_echo`, `run_server`, `ping` (эхо клиент↔сервер).
-- `overnet-cli` — **готово:** команды `server`/`client`.
-- `overnet-link-ostp` — **заглушка:** только проверка линковки с `ostp-core` (задача 4).
+Crates (flat in the `overnet/` root):
+- `overnet-core` — **done:** `Identity`, `Address`, `Link` (trait), `session`
+  (Noise), `onion` (layers). 7 tests green.
+- `overnet-link-tcp` — **done:** `TcpLink` (length-framed) + `TcpListenerLink`.
+- `overnet-node` — **done:** `serve_echo`, `run_server`, `ping` (client↔server
+  echo).
+- `overnet-cli` — **done:** `server`/`client` commands.
+- `overnet-link-ostp` — **a stub:** only checks linking against `ostp-core`
+  (task 4).
 
-### Точные сигнатуры API (чтобы не гадать)
+### Exact API signatures (so there's no guessing)
 
 ```rust
 // overnet-core
@@ -68,8 +77,8 @@ pub mod session {
     impl TransportKey { fn generate()->Result<Self>; }   // Clone
     pub struct Session<L:Link>;
     impl<L:Link> Session<L> {
-        async fn initiate(link:L, key:&TransportKey)->Result<Self>;  // клиент
-        async fn respond(link:L, key:&TransportKey)->Result<Self>;   // сервер
+        async fn initiate(link:L, key:&TransportKey)->Result<Self>;  // client
+        async fn respond(link:L, key:&TransportKey)->Result<Self>;   // server
         fn remote_static(&self)->&[u8];
         async fn send(&mut self,&[u8])->Result<()>;
         async fn recv(&mut self)->Result<Vec<u8>>;
@@ -95,143 +104,156 @@ impl TcpListenerLink { async fn bind(addr:&str)->Result<Self>;
 
 ---
 
-## ЗАДАЧА 1 — Маршрутизация onion A→R→B по `Link` (закрывает Веху 3 = MVP)
+## TASK 1 — Onion routing A→R→B over `Link` (closes milestone 3 = MVP)
 
-**Цель:** соединить готовые `Link` + `onion` в живой путь: клиент A шлёт
-сообщение адресату B через релей R; **R не может прочитать payload**, B получает.
+**Goal:** connect the existing `Link` + `onion` into a live path: client A sends
+a message to destination B through relay R; **R can't read the payload**, B
+receives it.
 
-**Где:** новый модуль в `overnet-node` (напр. `src/router.rs`).
+**Where:** a new module in `overnet-node` (e.g. `src/router.rs`).
 
-**Дизайн:**
-- У каждого узла есть `OnionKey` (его onion-идентичность) и **таблица соседей**:
-  `next_onion_pub: [u8;32] -> addr: String` (статически в тесте).
-- **Релей-цикл узла** (на каждом входящем `Link`):
+**Design:**
+- Every node has an `OnionKey` (its onion identity) and a **neighbour table**:
+  `next_onion_pub: [u8;32] -> addr: String` (static in the test).
+- **The node's relay loop** (for every incoming `Link`):
   1. `frame = link.recv().await?`
   2. `match onion::peel(&my_onion_key, &frame)?`:
-     - `Peeled::Forward{ next, inner }` → найти `addr` для `next` в таблице →
-       `TcpLink::connect(addr)` (или переиспользовать соединение) → `send(&inner)`.
-     - `Peeled::Deliver(payload)` → отдать payload приложению (в тесте — в канал/лог).
-- **Сторона A (отправитель):** `path = [R.onion_pub, B.onion_pub]`,
+     - `Peeled::Forward{ next, inner }` → look up `addr` for `next` in the
+       table → `TcpLink::connect(addr)` (or reuse a connection) → `send(&inner)`.
+     - `Peeled::Deliver(payload)` → hand the payload to the application (in the
+       test — a channel / log).
+- **Side A (sender):** `path = [R.onion_pub, B.onion_pub]`,
   `pkt = onion::wrap(&path, payload)?`, `TcpLink::connect(R_addr).send(&pkt)`.
-- В тесте входящие `Link`-кадры узел всегда трактует как onion-пакеты (упрощение;
-  в боевом протоколе будет тип кадра). Транспорт-`Link` тут — обычный TCP (onion
-  сам шифрует слои; шифрование самого Link добавит ostp в задаче 4 — ортогонально).
+- In the test a node always treats incoming `Link` frames as onion packets (a
+  simplification; the real protocol will have a frame type). The transport
+  `Link` here is plain TCP (the onion encrypts its own layers; encryption of the
+  Link itself comes with ostp in task 4 — orthogonal).
 
-**Тест приёмки** (интеграционный, в `overnet-node`):
+**Acceptance test** (integration, in `overnet-node`):
 ```
-A → R → B по TCP:
-  - B слушает, peel → Deliver(payload) → кладёт в канал.
-  - R слушает, peel → Forward → пересылает inner на адрес B.
-  - A: wrap([R_pub,B_pub], b"secret") и шлёт R.
-Проверить: B получил b"secret"; на стороне R peel дал Forward (не Deliver);
-           R НЕ видит b"secret" (как в onion::tests).
+A → R → B over TCP:
+  - B listens, peel → Deliver(payload) → puts it in a channel.
+  - R listens, peel → Forward → forwards inner to B's address.
+  - A: wrap([R_pub,B_pub], b"secret") and sends it to R.
+Check: B received b"secret"; on R's side peel returned Forward (not Deliver);
+       R does NOT see b"secret" (as in onion::tests).
 ```
 
-**Заметки/грабли:**
-- Это **однонаправленная** доставка A→B. Обратный путь (ответ) — Задача 1b
-  (reply-onion или установленная цепь). Не смешивать.
-- Следить за временем жизни соединений; в тесте можно connect-на-каждый-кадр.
+**Notes / pitfalls:**
+- This is **one-way** delivery A→B. The return path (a reply) is task 1b (a
+  reply onion or an established circuit). Don't mix them.
+- Watch connection lifetimes; in the test, connect-per-frame is fine.
 
-### ЗАДАЧА 1b — обратный путь / цепь (после 1)
-Дать B ответить A, не зная адреса A напрямую (reply-block / established circuit).
-Спроектировать минимально, описать в `docs/architecture.md`, реализовать + тест.
+### TASK 1b — the return path / circuit (after 1)
+Let B reply to A without knowing A's address directly (a reply block / an
+established circuit). Design it minimally, describe it in
+`docs/architecture.md`, implement + test.
 
 ---
 
-## ЗАДАЧА 2 — Корни доверия (genesis) и ваучеры: «зарегистрировать владельца»
+## TASK 2 — Trust roots (genesis) and vouchers: "register the owner"
 
-**Цель:** владелец и его устройства — самые доверенные лица сети. Реализовать
-корни доверия и подписанные ваучеры (основа open/vouched из `architecture.md §2`).
+**Goal:** the owner and their devices are the most trusted parties in the
+network. Implement trust roots and signed vouchers (the basis of open/vouched
+from `architecture.md §2`).
 
-**Где:** новый модуль `overnet-core/src/trust.rs`.
+**Where:** a new module `overnet-core/src/trust.rs`.
 
-**Дизайн:**
-- **Корень доверия** = ed25519-публичный ключ из набора, **вшитого в клиент/конфиг**
-  (`TrustRoots(Vec<VerifyingKey>)`). Корней несколько (не один) — против single point.
-- **Устройство** = `Identity` (ed25519). Устройства владельца либо сами корни,
-  либо напрямую подписаны корнем.
-- **Ваучер** = ed25519-подпись издателя над `(invitee_pubkey, capabilities, expiry, nonce)`:
+**Design:**
+- **A trust root** = an ed25519 public key from a set **built into the client /
+  config** (`TrustRoots(Vec<VerifyingKey>)`). Several roots (not one) — against
+  a single point.
+- **A device** = an `Identity` (ed25519). The owner's devices are either roots
+  themselves or signed directly by a root.
+- **A voucher** = the issuer's ed25519 signature over
+  `(invitee_pubkey, capabilities, expiry, nonce)`:
   ```rust
   pub struct Voucher { issuer:VerifyingKey, invitee:VerifyingKey,
                        caps:u32, expiry_unix:u64, nonce:[u8;16], sig:Signature }
   impl Voucher {
     fn create(issuer:&SigningKey, invitee:&VerifyingKey, caps:u32, expiry:u64)->Self;
-    fn verify(&self)->bool;                 // подпись над каноническими байтами
+    fn verify(&self)->bool;                 // signature over canonical bytes
   }
   ```
-  Переиспользовать `ed25519-dalek` (уже в `Identity`); канонические байты для
-  подписи — фиксированный порядок полей.
-- **Оценка доверия:** узел «доверенный», если есть валидная цепочка ваучеров от
-  одного из `TrustRoots` (для MVP — глубина 1: корень напрямую ваучит устройство;
-  цепочки длиннее — следующая итерация).
+  Reuse `ed25519-dalek` (already in `Identity`); the canonical bytes to sign are
+  the fields in a fixed order.
+- **Trust evaluation:** a node is "trusted" if there's a valid voucher chain
+  from one of the `TrustRoots` (for the MVP — depth 1: a root vouches for a
+  device directly; longer chains are the next iteration).
 
-**Тест приёмки:** create→verify ок; verify ловит подделку и просрочку (expiry);
-устройство, подписанное корнем, проходит `chains_to_root`, чужое — нет.
+**Acceptance test:** create→verify ok; verify catches forgery and expiry; a
+device signed by a root passes `chains_to_root`, a stranger doesn't.
 
-**Честные оговорки (записать в `docs/trust-and-membership.md`, создать файл):**
-корни — это допущение доверия (но множественные, и они только ваучат, не читают
-трафик); хранение «кто кого ваучил» сливает соцграф → позже анонимные удостоверения
-(Coconut/Privacy Pass), см. прошлые заметки в `architecture.md §2`.
-
----
-
-## ЗАДАЧА 3 — Клиент доступа: локальный шлюз `overnet://`
-
-**Цель:** дать человеку зайти в сеть без своего браузера.
-
-**Где:** новый крейт `overnet-gateway` (бинарь) + при необходимости в `overnet-node`.
-
-**Дизайн:**
-- Локальный HTTP-листенер на `127.0.0.1:<port>`.
-- Запрос на `name.ov` (или путь `overnet://name.ov/...`): резолвить `name.ov` →
-  криптоадрес сервиса (пока — статическая таблица/конфиг; directory-резолв позже),
-  построить onion-путь, отправить запрос (семантика HTTP, см. `app-protocol.md`),
-  вернуть ответ браузеру.
-- Сервис-сторона: узел-`Service` отвечает по своему криптоадресу контентом.
-- НЕ строить браузер. Пользователь наводит любой браузер на локальный порт; позже —
-  OS-обработчик схемы `overnet://`.
-
-**Тест приёмки:** локальный сервис `hello.ov` отдаёт страницу; gateway проксирует
-`GET hello.ov/` через onion (через узлы из Задачи 1) и возвращает тело. Релей не
-видит контент.
-
-**Зависит от:** Задача 1 (onion-маршрут).
+**Honest caveats (to write down in `docs/trust-and-membership.md`, create the
+file):** roots are a trust assumption (but multiple, and they only vouch, they
+don't read traffic); storing "who vouched for whom" leaks the social graph →
+later anonymous credentials (Coconut/Privacy Pass), see the earlier notes in
+`architecture.md §2`.
 
 ---
 
-## ЗАДАЧА 4 — `overnet-link-ostp`: обернуть `ostp::ProtocolMachine` как `Link` (Веха 4)
+## TASK 3 — An access client: a local `overnet://` gateway
 
-**Цель:** интернет-`Link` с Reality-мимикрией для фазы 1 — тест дом(РФ)↔загран-серверы.
+**Goal:** let a person get into the network without a browser of our own.
 
-**Где:** `overnet-link-ostp` (сейчас заглушка).
+**Where:** a new crate `overnet-gateway` (a binary) + `overnet-node` if needed.
 
-**Дизайн:**
-- Прочитать `../ostp/ostp-core/src/protocol.rs` (`ProtocolMachine`, `ProtocolConfig`,
-  `OstpEvent`, `ProtocolAction`, `OstpState`) и `crypto/reality.rs`.
-- Поднять несущий TCP-сокет, гонять по нему **sans-io** `ProtocolMachine`
-  (скармливать `OstpEvent::Inbound`, исполнять `ProtocolAction`), получить
-  established-туннель.
-- Обернуть established-поток в тип, реализующий `overnet_core::Link`
-  (`send`/`recv` поверх зашифрованного обфусцированного канала).
-- Лицензия: `ostp` и overnet оба AGPLv3 — ок.
+**Design:**
+- A local HTTP listener on `127.0.0.1:<port>`.
+- A request for `name.ov` (or the path `overnet://name.ov/...`): resolve
+  `name.ov` → the service's crypto address (a static table / config for now;
+  directory resolution later), build an onion path, send the request (HTTP
+  semantics, see `app-protocol.md`), return the response to the browser.
+- The service side: a `Service` node answers at its crypto address with content.
+- Do NOT build a browser. The user points any browser at the local port; later,
+  an OS handler for the `overnet://` scheme.
 
-**Тест приёмки:** два процесса, один — `ostp`-сервер-сторона, второй —
-`overnet-link-ostp` клиент; кадр проходит туда-обратно через обфусцированный туннель.
-(Если поднять полноценный `ostp` сложно в тесте — сначала smoke-тест конфигурации.)
+**Acceptance test:** a local service `hello.ov` serves a page; the gateway
+proxies `GET hello.ov/` through the onion (through the nodes from task 1) and
+returns the body. The relay doesn't see the content.
 
-**Грабли:** `ProtocolConfig` требует PSK/Reality-параметры; разобраться с ними по
-коду `ostp`. Не выдавать недоделанное за рабочее.
-
----
-
-## ЗАДАЧА 5 — Строгий onion (Sphinx) и защита метаданных (после MVP)
-Текущий `onion` — упрощённый (переменная длина, без replay-защиты). Перейти к
-Sphinx-свойствам: фиксированная длина пакета, защита от повторов, паддинг до
-неразличимости; mixnet-хук (задержки/cover) как опция. См. `architecture.md §4`,
-`glossary.md`. Заменить KDF на HKDF (сейчас SHA-256 — пометка в `onion.rs`).
+**Depends on:** task 1 (the onion route).
 
 ---
 
-## Порядок выполнения (рекомендация)
-1 → 2 → 3 (это даёт работающую сеть с доступом и доверием) → 4 (фаза 1 вживую) → 5.
-После каждой задачи: обновить чекбоксы в `docs/plan.md` и этот файл; `cargo test` зелёный.
+## TASK 4 — `overnet-link-ostp`: wrap `ostp::ProtocolMachine` as a `Link` (milestone 4)
+
+**Goal:** an internet `Link` with Reality mimicry for phase 1 — a home ↔
+servers-abroad test.
+
+**Where:** `overnet-link-ostp` (currently a stub).
+
+**Design:**
+- Read `../ostp/ostp-core/src/protocol.rs` (`ProtocolMachine`,
+  `ProtocolConfig`, `OstpEvent`, `ProtocolAction`, `OstpState`) and
+  `crypto/reality.rs`.
+- Open a carrier TCP socket and drive the **sans-io** `ProtocolMachine` over it
+  (feed `OstpEvent::Inbound`, execute `ProtocolAction`) to get an established
+  tunnel.
+- Wrap the established stream in a type implementing `overnet_core::Link`
+  (`send`/`recv` over the encrypted, obfuscated channel).
+- License: `ostp` and overnet are both AGPLv3 — fine.
+
+**Acceptance test:** two processes, one the `ostp` server side, the other an
+`overnet-link-ostp` client; a frame goes there and back through the obfuscated
+tunnel. (If bringing up a full `ostp` in a test is hard, start with a
+configuration smoke test.)
+
+**Pitfalls:** `ProtocolConfig` needs PSK / Reality parameters; work them out
+from the `ostp` code. Don't pass off unfinished work as working.
+
+---
+
+## TASK 5 — A strict onion (Sphinx) and metadata protection (after the MVP)
+The current `onion` is simplified (variable length, no replay protection). Move
+to Sphinx properties: a fixed packet length, replay protection, padding to
+indistinguishability; a mixnet hook (delays / cover) as an option. See
+`architecture.md §4`, `glossary.md`. Replace the KDF with HKDF (SHA-256 now —
+noted in `onion.rs`).
+
+---
+
+## Order of work (recommendation)
+1 → 2 → 3 (this gives a working network with access and trust) → 4 (phase 1
+live) → 5. After each task: update the checkboxes in `docs/plan.md` and this
+file; `cargo test` green.

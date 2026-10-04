@@ -1,3 +1,5 @@
+**English** · [Русский](ru/philosophy.md)
+
 # overnet philosophy
 
 *Version 0.1 — 2026-06-23. A living document and a working notebook, not a manifesto set in stone.*

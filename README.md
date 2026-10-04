@@ -1,3 +1,5 @@
+**English** · [Русский](README.ru.md)
+
 # overnet
 
 > A network that survives the hostility of its own infrastructure.
@@ -59,7 +61,9 @@ point that can be taken away.
 
 **v0.2:** Tor-style circuits and streams, `.ov` services through intro points,
 a SOCKS5 gateway, network service sites (`name.ov`, `search.ov`, `files.ov`,
-`mail.ov`) and a Mullvad Browser launcher with an overnet profile. Together with
+`mail.ov`, `source.ov`) and **overnet browser** — Mullvad Browser repackaged
+with overnet built in (its own gateway, a network indicator, regular sites kept
+outside). Together with
 ostp: an ostp server brings its clients into `.ov` and can act as an overnet
 exit. How to run it — [docs/running.md](docs/running.md), which also has an
 honest list of what is still missing.
@@ -72,15 +76,18 @@ Linux and macOS:
 curl -fsSL https://raw.githubusercontent.com/ospab/overnet/master/scripts/install.sh | sudo bash
 ```
 
-Windows (PowerShell, no administrator rights needed):
+Windows (PowerShell, no administrator rights needed) — overnet and overnet
+browser:
 
 ```powershell
 irm https://raw.githubusercontent.com/ospab/overnet/master/scripts/install.ps1 | iex
 ```
 
+Update later with `overnet update`.
+
 A relay or a network site on a Linux server, as a systemd service:
 `… | sudo bash -s -- --role relay` (see `install.sh --help` and
-[docs/running.md](docs/running.md#установка)). The source code is also served
+[docs/running.md](docs/running.md#install)). The source code is also served
 inside the network at `http://source.ov/`.
 
 ## The principle that must not be broken

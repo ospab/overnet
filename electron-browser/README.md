@@ -1,11 +1,19 @@
+**English** · [Русский](README.ru.md)
+
+> **Outdated.** The overnet browser is now Gecko-based — overnet browser (a
+> repackaged Mullvad Browser); see [docs/running.md](../docs/running.md#the-browser)
+> and the [decision log](../docs/decisions.md).
+
 # overnet-electron-browser
 
-Минимальный браузер overnet на Electron (Chromium). Вешает схему `overnet://` на
-локальный HTTP-шлюз ядра overnet — сам браузер про onion/сеть ничего не знает.
+A minimal overnet browser on Electron (Chromium). It maps the `overnet://`
+scheme onto the overnet core's local HTTP gateway — the browser itself knows
+nothing about onions or the network.
 
-## Запуск
+## Running
 
-Сначала подними ядро overnet (в отдельных окнах), включая шлюз на `:8088`:
+First start the overnet core (in separate windows), including the gateway on
+`:8088`:
 
 ```
 overnet bootstrap 127.0.0.1:8080
@@ -13,19 +21,19 @@ overnet service   0.0.0.0:4040 127.0.0.1:8080
 overnet gateway   127.0.0.1:8088 127.0.0.1:8080
 ```
 
-(Ветку `gateway` в `overnet-cli` нужно добавить — см. ниже.)
+(The `gateway` branch has to be added to `overnet-cli` — see below.)
 
-Потом браузер:
+Then the browser:
 
 ```
 cd electron-browser
-npm install      # скачает Electron (~200 МБ, один раз)
+npm install      # downloads Electron (~200 MB, once)
 npm start
 ```
 
-В адресной строке: `overnet://search.ov/` → страница от твоего service-узла.
+In the address bar: `overnet://search.ov/` → a page from your service node.
 
-## Ветка `gateway` для overnet-cli
+## The `gateway` branch for overnet-cli
 
 ```rust
 Some("gateway") => {
@@ -36,20 +44,22 @@ Some("gateway") => {
 }
 ```
 
-## Как это устроено
+## How it works
 
 ```
 overnet://search.ov/path
    │  (Electron protocol.handle)
    ▼
-GET http://127.0.0.1:8088/path        ← локальный шлюз (overnet_node::web::run_gateway)
+GET http://127.0.0.1:8088/path        ← local gateway (overnet_node::web::run_gateway)
    │  (bootstrap → onion → service)
    ▼
-HTML от service-узла → рендер в webview
+HTML from the service node → rendered in the webview
 ```
 
 ## TODO
 
-- Авто-запуск ядра overnet как сайдкара из `main.js` (сейчас запускается отдельно).
-- Вкладки, история, индикатор соединения.
-- Резолв `name.ov → pubkey` через каталог (сейчас берётся первый service-узел).
+- Start the overnet core as a sidecar from `main.js` (it's started separately
+  now).
+- Tabs, history, a connection indicator.
+- Resolve `name.ov → pubkey` through the directory (currently the first service
+  node is taken).

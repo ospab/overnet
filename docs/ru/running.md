@@ -1,11 +1,13 @@
+[English](../running.md) · **Русский**
+
 # Запуск overnet v0.2: цепи, сервисы .ov, браузер
 
-*2026-10-01. Как поднять сеть, опубликовать сайт и смотреть его в браузере;
+*Как поднять сеть, опубликовать сайт и смотреть его в браузере;
 как overnet работает вместе с ostp.*
 
 ---
 
-## Что изменилось в v0.2
+## Что такое v0.2
 
 Сеть построена по образцу Tor, но без его инфраструктуры:
 
@@ -61,13 +63,17 @@ Windows (PowerShell, без прав администратора):
 irm https://raw.githubusercontent.com/ospab/overnet/master/scripts/install.ps1 | iex
 ```
 
-Бинарник — `%LOCALAPPDATA%\Programs\overnet` (добавляется в PATH пользователя),
-конфиг — `%LOCALAPPDATA%\overnet\config.json`. С параметрами:
-`& ([scriptblock]::Create((irm …/install.ps1))) -ConfigUrl https://…/config.json`.
+Ставит overnet в `%LOCALAPPDATA%\Programs\overnet` (добавляется в PATH
+пользователя) и **overnet browser** в `%LOCALAPPDATA%\Programs\overnet-browser`,
+с ярлыком в меню «Пуск». Конфиг — `%LOCALAPPDATA%\overnet\config.json`. С
+параметрами: `& ([scriptblock]::Create((irm …/install.ps1))) -NoBrowser` (или
+`-ConfigUrl https://…/config.json`).
+
+Обновиться потом: `overnet update` (в Linux — `sudo overnet update`).
 
 Релеи и адреса служебных сайтов основной сети вшиты в программу (`SEED_RELAYS` и
 `PINNED` в `overnet-node/src/net/names.rs`), так что клиенту конфиг не нужен:
-`overnet browser` работает сразу после установки. `relays` и `reserved` в
+браузер работает сразу после установки. `relays` и `reserved` в
 конфиге нужны только для своей сети — они перекрывают вшитые значения.
 
 Без `--config` overnet ищет конфиг так: `$OVERNET_CONFIG`, `./config.json`,
@@ -83,7 +89,8 @@ irm https://raw.githubusercontent.com/ospab/overnet/master/scripts/install.ps1 |
 | сайт | `overnet service --key shop.key --port 80=127.0.0.1:8080` | любой локальный HTTP-сервер становится сайтом .ov |
 | служебный сайт | `overnet site name\|search\|files\|mail` | регистратор, поиск, файлы, почта |
 | клиент | `overnet gateway` | SOCKS5 на 127.0.0.1:9150 |
-| браузер | `overnet browser` | Mullvad Browser с профилем overnet |
+| браузер | `overnet browser` | overnet browser (или Mullvad Browser с профилем overnet) |
+| обновление | `overnet update` | поставить последний релиз |
 
 Конфиг (`config.json`, флаг `--config`):
 
@@ -100,7 +107,7 @@ irm https://raw.githubusercontent.com/ospab/overnet/master/scripts/install.ps1 |
   },
   "gateway": { "listen": "127.0.0.1:9150", "clearnet": "direct" },
   "relay":   { "listen": "0.0.0.0:4040", "bootstrap": "1.2.3.4:8080", "exit": "off" },
-  "browser": { "path": "", "gateway": "auto" }
+  "browser": { "path": "", "gateway": "auto", "clearnet": "block" }
 }
 ```
 
@@ -108,8 +115,9 @@ Bootstrap-серверу стоит задать `node_ttl_secs` (наприме
 релеи пропадали из каталога. Релеи v0.1 (`overnet legacy relay`) ячеек не
 понимают — не смешивайте их с v0.2 в одном каталоге.
 
-`gateway.clearnet` — куда шлюз отправляет всё, что не `.ov`: `direct` (как без
-шлюза, ваш IP виден сайтам), `exit` (через выход overnet) или `block`.
+`gateway.clearnet` — куда обычный шлюз отправляет всё, что не `.ov`: `direct`
+(как без шлюза, ваш IP виден сайтам), `exit` (через выход overnet) или `block`.
+В браузере вместо него действует `browser.clearnet`, по умолчанию `block`.
 
 ## Попробовать на одной машине
 
@@ -133,26 +141,46 @@ overnet name-sign shop.ov --key shop.key         # вставить на http://
 
 ## Браузер
 
-`overnet browser` запускает **Mullvad Browser** (Firefox ESR с защитой от
-отпечатков от Tor Project, без Tor) с отдельным профилем: тёмная тема overnet,
-SOCKS5 с удалённым DNS (иначе `.ov` утёк бы в системный DNS), выключенный DoH,
-`search.ov` как домашняя страница, служебные сайты `.ov` в списке безопасных
-контекстов (иначе почта не сможет шифровать в браузере). Сайты `.ov` открываются
-по `http://` — шифрует сама сеть; обычные сайты браузер по-прежнему переводит на
-https (режим HTTPS-first).
+**overnet browser** — это Mullvad Browser (Firefox ESR с защитой от отпечатков
+от Tor Project, без Tor), перепакованный со встроенным overnet
+(`browser/repack.py`; собирается в GitHub Actions из последнего подписанного
+релиза Mullvad Browser):
 
-**Детект ostp.** Перед запуском браузер резолвит `name.ov` системным DNS. Если
-ответ — фиктивный адрес ostp (`198.18.0.0/15`), значит работает VPN ostp в
-режиме TUN, а его сервер выводит `.ov` в overnet. Тогда браузер запускается без
-прокси. Иначе поднимается локальный шлюз (или берётся уже запущенный). Режим
-меняется флагом `--gateway auto|always|never`. `always` полезен, если не хотите,
-чтобы сервер ostp видел, какие сайты `.ov` вы открываете.
+- **Свой шлюз.** Браузер сам запускает встроенный `overnet` и гасит его, когда
+  закрывается. Окна терминала, которое нельзя закрывать, больше нет.
+- **overnet в интерфейсе.** Индикатор на панели, цвет — состояние сети
+  (фиолетовый — подключено, жёлтый — подключается, красный — шлюз не отвечает);
+  по нажатию — панель со статусом, режимом обычных сайтов, кнопками **New
+  circuits** и стартовой страницей. Тот же статус и **New overnet circuits** —
+  вверху меню ☰. На сайтах `.ov` в адресной строке — знак overnet вместо «Не
+  защищено»: соединение шифрует сама сеть.
+- **Стартовая страница `browser.ov`** — её отдаёт сам шлюз, без сети: поиск,
+  служебные сайты, состояние сети.
+- **Обычные сайты — снаружи.** youtube.com и любой другой сайт не из `.ov`
+  открывают страницу «это не сайт overnet» с кнопками **Open in my regular
+  browser** и **Go back**: прямое соединение выдало бы ваш IP рядом с визитами
+  на .ov. С `"browser": {"clearnet": "exit"}` обычные сайты идут через
+  выходные релеи overnet, если они есть в сети.
+- **Настройки:** SOCKS5 с удалённым DNS (иначе `.ov` утёк бы в системный DNS),
+  выключенный DoH, `search.ov` как поисковик, апдейтер и VPN-расширение Mullvad
+  убраны. Сайты `.ov` открываются по `http://` — шифрует сама сеть; обычные
+  сайты браузер по-прежнему переводит на https (HTTPS-first).
 
-Если Mullvad Browser не найден, запускается Firefox с предупреждением: у него
-нет защиты от отпечатков. Путь можно задать в `browser.path` или в
-`OVERNET_BROWSER`.
+`overnet browser` запускает overnet browser, если он установлен. Иначе —
+Mullvad Browser с отдельным профилем overnet и своим шлюзом в терминале (окно
+не закрывать), а если нет и его — Firefox с предупреждением: у него нет защиты
+от отпечатков. Путь можно задать в `browser.path` или в `OVERNET_BROWSER`.
 
-**Телефоны.** Mullvad Browser есть только для Windows, macOS и Linux. На Android
+**Детект ostp** (только для запасного варианта с Mullvad Browser). Перед
+запуском команда резолвит `name.ov` системным DNS. Если ответ — фиктивный адрес
+ostp (`198.18.0.0/15`), значит работает VPN ostp в режиме TUN, а его сервер
+выводит `.ov` в overnet. Тогда браузер запускается без прокси. Иначе поднимается
+локальный шлюз (или берётся уже запущенный). Режим меняется флагом
+`--gateway auto|always|never`. `always` полезен, если не хотите, чтобы сервер
+ostp видел, какие сайты `.ov` вы открываете.
+
+**Телефоны.** overnet browser пока только для компьютера (Windows; сборки для
+Linux и macOS — следующие). На Android
 и iOS overnet работает через приложение ostp в режиме VPN с сервером, где
 включён `overnet.entry`: тогда `.ov` открывается в любом браузере. Почта
 `mail.ov` там пока не работает, потому что мобильные браузеры не считают

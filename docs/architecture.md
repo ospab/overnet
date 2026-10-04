@@ -1,3 +1,5 @@
+**English** · [Русский](ru/architecture.md)
+
 # overnet architecture
 
 *Version 0.1 — 2026-06-23. A draft. Much is still open — open questions are marked explicitly.*

@@ -1,3 +1,5 @@
+**English** · [Русский](ru/naming.md)
+
 # Naming and addressing
 
 *Version 0.1 — 2026-06-23. How overnet participants find and address each other.*

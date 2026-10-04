@@ -1,3 +1,5 @@
+**English** · [Русский](ru/threat-model.md)
+
 # overnet threat model
 
 *Version 0.1 — 2026-06-23. Without this document the rest of the design is guesswork.*
