@@ -132,10 +132,29 @@ jobs:
           "$((Get-FileHash $name -Algorithm SHA256).Hash.ToLower())  $name" | Out-File -Encoding ascii -NoNewline "$name.sha256"
           Write-Host "Mullvad Browser $env:MULLVAD_VERSION -> $name ($([math]::Round((Get-Item $name).Length/1MB)) MB)"
 
+      # Обычный установщик для людей: overnet-browser-setup.exe (Inno Setup).
+      - name: Installer
+        shell: pwsh
+        run: |
+          python browser/icons.py dist/icons
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          $ver = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          & $iscc /Qp "/DAppVersion=$ver" "/DSourceDir=$PWD\dist\overnet-browser\Browser" "/DIconFile=$PWD\dist\icons\overnet.ico" "/O$PWD" browser\installer.iss
+          if ($LASTEXITCODE) { throw "ISCC failed" }
+          $name = "overnet-browser-setup.exe"
+          "$((Get-FileHash $name -Algorithm SHA256).Hash.ToLower())  $name" | Out-File -Encoding ascii -NoNewline "$name.sha256"
+          Write-Host "$name ($([math]::Round((Get-Item $name).Length/1MB)) MB)"
+
       - uses: actions/upload-artifact@v4
         with:
           name: overnet-browser-windows-amd64.zip
           path: overnet-browser-windows-amd64.zip*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: overnet-browser-setup.exe
+          path: overnet-browser-setup.exe*
 
       - uses: actions/upload-artifact@v4
         if: always()
