@@ -70,14 +70,23 @@ honest list of what is still missing.
 
 ## Install
 
-Linux and macOS:
+**overnet browser for Windows:** download and run
+[overnet-browser-setup.exe](https://github.com/ospab/overnet/releases/latest/download/overnet-browser-setup.exe)
+(no administrator rights needed).
+
+**overnet browser for Android:**
+[overnet-browser-android-arm64-v8a.apk](https://github.com/ospab/overnet/releases/latest/download/overnet-browser-android-arm64-v8a.apk)
+for most phones, [armeabi-v7a](https://github.com/ospab/overnet/releases/latest/download/overnet-browser-android-armeabi-v7a.apk) for
+older 32-bit ones.
+
+The command-line node, Linux and macOS:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ospab/overnet/master/scripts/install.sh | sudo bash
 ```
 
-Windows (PowerShell, no administrator rights needed) — overnet and overnet
-browser:
+Windows, the node and overnet browser together (PowerShell, no administrator
+rights needed):
 
 ```powershell
 irm https://raw.githubusercontent.com/ospab/overnet/master/scripts/install.ps1 | iex

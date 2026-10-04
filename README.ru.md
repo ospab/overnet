@@ -68,13 +68,22 @@ overnet. Как запустить — [docs/ru/running.md](docs/ru/running.md);
 
 ## Установка
 
-Linux и macOS:
+**overnet browser для Windows:** скачайте и запустите
+[overnet-browser-setup.exe](https://github.com/ospab/overnet/releases/latest/download/overnet-browser-setup.exe)
+(права администратора не нужны).
+
+**overnet browser для Android:**
+[overnet-browser-android-arm64-v8a.apk](https://github.com/ospab/overnet/releases/latest/download/overnet-browser-android-arm64-v8a.apk)
+для большинства телефонов, [armeabi-v7a](https://github.com/ospab/overnet/releases/latest/download/overnet-browser-android-armeabi-v7a.apk)
+для старых 32-битных.
+
+Узел для командной строки, Linux и macOS:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ospab/overnet/master/scripts/install.sh | sudo bash
 ```
 
-Windows (PowerShell, права администратора не нужны) — overnet и overnet browser:
+Windows, узел и overnet browser вместе (PowerShell, права администратора не нужны):
 
 ```powershell
 irm https://raw.githubusercontent.com/ospab/overnet/master/scripts/install.ps1 | iex
