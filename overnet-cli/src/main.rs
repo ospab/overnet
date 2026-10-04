@@ -1,7 +1,6 @@
 //! `overnet` — командная строка сети.
 
 mod browser;
-mod browser_ui;
 mod config;
 mod legacy;
 mod update;
@@ -19,7 +18,7 @@ use overnet_node::net::client::Client;
 use overnet_node::net::dir::{self, RelayDesc};
 use overnet_node::net::exit::ExitPolicy;
 use overnet_node::net::gateway::{Clearnet, Gateway};
-use overnet_node::net::names::{NameRecord, Names, RESERVED};
+use overnet_node::net::names::{NameRecord, Names};
 use overnet_node::net::service::Service;
 use overnet_node::net::Node;
 
@@ -300,10 +299,7 @@ fn site_router(kind: &str, data: &Path, cfg: &Config, crawl_every: Duration) -> 
 
 /// Поднять HTTP-сервер на loopback; вернуть его адрес.
 async fn serve_http(app: axum::Router, listen: &str) -> String {
-    let l = tokio::net::TcpListener::bind(listen).await.unwrap_or_else(|e| die(e));
-    let addr = l.local_addr().unwrap().to_string();
-    tokio::spawn(async move { axum::serve(l, app).await });
-    addr
+    overnet_cli::serve_http(app, listen).await.unwrap_or_else(|e| die(format!("{listen}: {e}")))
 }
 
 /// Выйти, когда закроется stdin: браузер держит трубу открытой, пока жив, и
@@ -320,28 +316,8 @@ fn exit_with_stdin() {
 /// `open_external` — страницы browser.ov могут открыть сайт в обычном браузере
 /// этой машины (шлюз запущен для браузера, а не на сервере).
 async fn gateway(cfg: &Config, clearnet: Clearnet, open_external: bool) -> Arc<Gateway> {
-    let c = client(cfg);
-    let names = Names::new(c.clone(), &cfg.reserved).unwrap_or_else(|e| die(e));
-    // Каталог — в фоне: шлюз слушает порт сразу, и первая страница браузера не
-    // упирается в «прокси отказал». Запросы до каталога дождутся его сами.
-    {
-        let c = c.clone();
-        tokio::spawn(async move {
-            match c.refresh_directory().await {
-                Ok(n) => println!("directory: {n} relays"),
-                Err(e) => eprintln!("directory not available yet ({e}); will retry on the first request"),
-            }
-        });
-    }
-    c.spawn_directory_refresh(Duration::from_secs(600));
-    let missing: Vec<&str> = RESERVED.iter().copied().filter(|n| !names.reserved().contains_key(*n)).collect();
-    if !missing.is_empty() {
-        eprintln!("addresses not set: {} (the \"reserved\" section of the config)", missing.join(", "));
-    }
-    let ui = Arc::new(browser_ui::Ui::new(c.clone(), clearnet, open_external));
-    let ui_addr = serve_http(browser_ui::router(ui), "127.0.0.1:0").await;
-    let local = [("browser.ov".to_string(), ui_addr.parse().expect("loopback address"))].into_iter().collect();
-    Arc::new(Gateway { client: c, names, clearnet, local })
+    let relays = cfg.relays().unwrap_or_else(|e| die(e));
+    overnet_cli::start_gateway(relays, &cfg.reserved, clearnet, open_external).await.unwrap_or_else(|e| die(e))
 }
 
 async fn serve_gateway(gw: Arc<Gateway>, listen: &str) {
