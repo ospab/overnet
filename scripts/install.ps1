@@ -193,7 +193,7 @@ function Install-Browser {
     $btmp = Join-Path $env:TEMP "overnet_browser_$PID"
     New-Item -ItemType Directory -Path $btmp -Force | Out-Null
     $bzip = Join-Path $btmp $name
-    Write-Host "Downloading: $name ($tag, about 220 MB)"
+    Write-Host "Downloading: $name ($tag, about 120 MB)"
     try {
         Get-File -Uri $burl -OutFile $bzip
     } catch {
