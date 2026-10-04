@@ -162,14 +162,23 @@ jobs:
           name: browser-smoke-screenshots
           path: shots
 
-  # Android: overnet browser на GeckoView со шлюзом overnet внутри (android/,
-  # overnet-android). Один APK на процессор: arm64 и 32-битный ARM.
+  # Android: overnet browser — Firefox для Android (Fenix) с overnet внутри,
+  # как Mullvad Browser на ПК (android/fenix/patch.py). GeckoView не
+  # компилируется: artifact build берёт готовый у Mozilla для той же ревизии.
   android:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { gecko: aarch64-linux-android, abi: arm64-v8a }
+          - { gecko: arm-linux-androideabi, abi: armeabi-v7a }
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: overnet
+    timeout-minutes: 240
     steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          df -h /
       - uses: actions/checkout@v4
         with:
           path: overnet
@@ -183,11 +192,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: overnet
-          key: android
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
+          key: android-${{ matrix.abi }}
       - uses: nttld/setup-ndk@v1
         id: ndk
         with:
@@ -195,41 +200,65 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-ndk
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "9.8.0"
 
-      - name: Rust library
+      # Ветка release: та версия, что Mozilla выпускает как Firefox для Android.
+      - name: Firefox source
+        run: |
+          git clone --depth 1 -b release https://github.com/mozilla-firefox/firefox.git firefox
+          git -C firefox log -1 --format="Firefox %H %cd"
+          cat firefox/config/milestone.txt | tail -1
+
+      - name: Bootstrap
+        working-directory: firefox
+        run: |
+          cat > mozconfig <<EOF
+          ac_add_options --enable-project=mobile/android
+          ac_add_options --target=${{ matrix.gecko }}
+          ac_add_options --enable-artifact-builds
+          mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/objdir
+          EOF
+          ./mach --no-interactive bootstrap --application-choice "GeckoView/Firefox for Android Artifact Mode"
+
+      - name: Gecko (artifact build)
+        working-directory: firefox
+        run: ./mach build
+
+      - name: overnet gateway
+        working-directory: overnet
         env:
           ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
         run: >
-          cargo ndk -t arm64-v8a -t armeabi-v7a --platform 26
-          -o android/app/src/main/jniLibs build --release -p overnet-android
+          cargo ndk -t ${{ matrix.abi }} --platform 26
+          -o ../firefox/mobile/android/fenix/app/src/main/jniLibs build --release -p overnet-android
 
-      # Ключ подписи из секретов; без них APK подписан отладочным ключом.
-      - name: APK
-        working-directory: overnet/android
+      - name: Patch Fenix
+        run: python3 overnet/android/fenix/patch.py firefox/mobile/android/fenix
+
+      - name: Fenix
+        working-directory: firefox
+        run: |
+          ./mach gradle fenix:assembleRelease -PdisableDebugSigning
+          find objdir/gradle -name "*.apk" | xargs ls -la
+
+      - name: Sign
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
-          OVERNET_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_B64" ]; then
-            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/overnet.jks"
-            export OVERNET_KEYSTORE="$RUNNER_TEMP/overnet.jks"
-          else
-            echo "::warning::no ANDROID_KEYSTORE_B64 secret: the APK is signed with a debug key"
-          fi
-          gradle --no-daemon assembleRelease
-          cd app/build/outputs/apk/release
-          for abi in arm64-v8a armeabi-v7a; do
-            name=overnet-browser-android-$abi.apk
-            mv app-$abi-release.apk "$GITHUB_WORKSPACE/$name"
-            (cd "$GITHUB_WORKSPACE" && sha256sum "$name" > "$name.sha256" && ls -la "$name")
-          done
+          tools=$(ls -d ~/.mozbuild/android-sdk-linux/build-tools/* | sort -V | tail -1)
+          apk=$(find firefox/objdir/gradle -path "*fenix*release*" -name "*${{ matrix.abi }}*.apk" | head -1)
+          [ -n "$apk" ] || apk=$(find firefox/objdir/gradle -path "*fenix*release*" -name "*.apk" | head -1)
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/overnet.jks"
+          name=overnet-browser-android-${{ matrix.abi }}.apk
+          "$tools/zipalign" -f -p 4 "$apk" aligned.apk
+          "$tools/apksigner" sign --ks "$RUNNER_TEMP/overnet.jks" --ks-key-alias overnet             --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEYSTORE_PASSWORD --out "$name" aligned.apk
+          "$tools/apksigner" verify "$name"
+          sha256sum "$name" > "$name.sha256"
+          ls -la "$name"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: overnet-browser-android
+          name: overnet-browser-android-${{ matrix.abi }}
           path: overnet-browser-android-*
 
   release:
