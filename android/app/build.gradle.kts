@@ -11,8 +11,10 @@ val (vMajor, vMinor, vPatch) = cargoVersion.split('.').map { it.takeWhile(Char::
 
 android {
     namespace = "com.ospab.overnet"
-    // GeckoView 157 and its androidx.core need API 37 to compile against.
-    compileSdk = 37
+    // GeckoView 157 and its androidx.core need API 37.1+ to compile against.
+    compileSdk {
+        version = release(37) { minorApiLevel = 2 }
+    }
 
     defaultConfig {
         applicationId = "com.ospab.overnet"
