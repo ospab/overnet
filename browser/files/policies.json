@@ -1,0 +1,21 @@
+{
+  "policies": {
+    "DisableAppUpdate": true,
+    "Homepage": { "URL": "http://browser.ov/", "StartPage": "homepage", "Locked": false },
+    "SearchEngines": {
+      "Add": [
+        {
+          "Name": "overnet",
+          "Description": "Search .ov sites",
+          "URLTemplate": "http://search.ov/?q={searchTerms}",
+          "Method": "GET",
+          "Alias": "ov"
+        }
+      ],
+      "Default": "overnet"
+    },
+    "ExtensionSettings": {
+      "{d19a89b9-76c1-4a61-bcd4-49e8de916403}": { "installation_mode": "blocked" }
+    }
+  }
+}

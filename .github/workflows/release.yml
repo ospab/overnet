@@ -72,14 +72,82 @@ jobs:
           name: ${{ matrix.name }}
           path: overnet/${{ matrix.name }}*
 
-  release:
+  # overnet browser: свежий Mullvad Browser (подпись проверяется) + брендинг,
+  # настройки, autoconfig и overnet.exe из задачи build. См. browser/repack.py.
+  browser:
     needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: overnet-windows-amd64.zip
+          path: ovzip
+
+      - name: Download Mullvad Browser
+        shell: pwsh
+        run: |
+          $d = Invoke-RestMethod https://cdn.mullvad.net/browser/update_responses/update_1/release/downloads.json
+          $w = $d.downloads.win64.ALL
+          Write-Host "Mullvad Browser $($d.version): $($w.binary)"
+          Invoke-WebRequest $w.binary -OutFile mb.exe
+          Invoke-WebRequest $w.sig -OutFile mb.exe.asc
+          Invoke-WebRequest https://mullvad.net/media/mullvad-code-signing.asc -OutFile mullvad-signing.asc
+          "MULLVAD_VERSION=$($d.version)" >> $env:GITHUB_ENV
+
+      - name: Verify the signature
+        shell: bash
+        run: |
+          gpg --batch --import mullvad-signing.asc
+          gpg --batch --verify mb.exe.asc mb.exe
+
+      - name: Unpack
+        shell: pwsh
+        run: |
+          7z x mb.exe -omb -y | Out-Null
+          $exe = Get-ChildItem mb -Recurse -Filter mullvadbrowser.exe | Select-Object -First 1
+          if (-not $exe) { Get-ChildItem mb -Recurse | Select-Object -First 50 FullName; throw "mullvadbrowser.exe not found in the installer" }
+          "MULLVAD_DIR=$($exe.DirectoryName)" >> $env:GITHUB_ENV
+          Expand-Archive ovzip/overnet-windows-amd64.zip -DestinationPath ov
+          Invoke-WebRequest https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe -OutFile rcedit.exe
+
+      - name: Repack
+        run: python browser/repack.py --mullvad "${{ env.MULLVAD_DIR }}" --overnet ov/overnet.exe --out dist/overnet-browser --rcedit rcedit.exe
+
+      - name: Smoke test
+        run: python browser/smoke.py dist/overnet-browser/overnet-browser.exe shots --offline
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $name = "overnet-browser-windows-amd64.zip"
+          7z a -tzip -mx=7 $name ./dist/overnet-browser | Out-Null
+          "$((Get-FileHash $name -Algorithm SHA256).Hash.ToLower())  $name" | Out-File -Encoding ascii -NoNewline "$name.sha256"
+          Write-Host "Mullvad Browser $env:MULLVAD_VERSION -> $name ($([math]::Round((Get-Item $name).Length/1MB)) MB)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: overnet-browser-windows-amd64.zip
+          path: overnet-browser-windows-amd64.zip*
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-smoke-screenshots
+          path: shots
+
+  release:
+    needs: [build, browser]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: out
+          pattern: overnet-*
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:

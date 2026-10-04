@@ -53,6 +53,7 @@ pub fn router(ui: Arc<Ui>) -> Router {
         .route("/go", get(go))
         .route("/open", get(open))
         .route("/new-circuits", post(new_circuits))
+        .route("/status.json", get(status))
         .merge(overnet_sites::assets())
         .with_state(ui)
 }
@@ -200,6 +201,27 @@ async fn open(State(ui): State<Arc<Ui>>, Query(q): Query<Target>) -> Response {
         ),
     };
     page("Opened in your regular browser", &body)
+}
+
+/// Состояние для индикатора в интерфейсе браузера. Токен здесь нужен самому
+/// браузеру (кнопка «New circuits»); чужие страницы этот JSON прочитать не
+/// могут: заголовков CORS нет.
+async fn status(State(ui): State<Arc<Ui>>) -> Response {
+    let (relays, exits) = ui.client.directory_size();
+    let clearnet = match ui.clearnet {
+        Clearnet::Block => "block",
+        Clearnet::Exit => "exit",
+        Clearnet::Direct => "direct",
+    };
+    let body = serde_json::json!({
+        "relays": relays,
+        "exits": exits,
+        "clearnet": clearnet,
+        "clearnet_open": ui.clearnet_open(),
+        "version": env!("CARGO_PKG_VERSION"),
+        "token": ui.token,
+    });
+    ([(header::CACHE_CONTROL, "no-store"), (header::CONTENT_TYPE, "application/json")], body.to_string()).into_response()
 }
 
 #[derive(Deserialize)]
