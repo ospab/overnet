@@ -29,7 +29,7 @@ import org.mozilla.geckoview.GeckoSession.NavigationDelegate
 import org.mozilla.geckoview.GeckoSession.NavigationDelegate.LoadRequest
 import org.mozilla.geckoview.GeckoSessionSettings
 import org.mozilla.geckoview.GeckoView
-import org.mozilla.geckoview.PermissionDelegate
+import org.mozilla.geckoview.GeckoSession.PermissionDelegate
 import java.net.URLEncoder
 
 private const val HOME = "http://browser.ov/"
